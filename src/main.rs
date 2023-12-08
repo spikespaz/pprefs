@@ -60,9 +60,10 @@ pub mod cpufreq {
         let mut buf = [0; SYSFS_MAX_ATTR_BYTES];
         let bytes_read = file.read(&mut buf)?;
         // Unchecked conversion is safe because this attribute is ASCII.
-        let content = unsafe { String::from_utf8_unchecked(Vec::from(&buf[..bytes_read])) };
-        let content = content.trim_end_matches('\n'); // I do not think this should be necessary, but evidently it is.
-                                                      // Unwrap is safe because the documentation guarantees a list of space-separated ASCII numbers.
+        let content = unsafe { std::str::from_utf8_unchecked(&buf[..bytes_read]) };
+        // I do not think this should be necessary, but evidently it is.
+        let content = content.trim_end_matches('\n');
+        // Unwrap is safe because the documentation guarantees a list of space-separated ASCII numbers.
         Ok(content.split(' ').map(|cpu| cpu.parse().unwrap()).collect())
     }
 }
