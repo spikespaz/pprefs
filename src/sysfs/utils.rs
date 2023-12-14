@@ -7,8 +7,10 @@
 // The maximum number of bytes that can be read from any given
 // *sysfs* attribute. Generally there should be nothing larger than this.
 
+use std::fmt::Debug;
 use std::fs::OpenOptions;
-use std::io::Read;
+use std::io::{ErrorKind, Read};
+use std::str::FromStr;
 
 const SYSFS_MAX_ATTR_BYTES: usize = 1024;
 
@@ -24,6 +26,7 @@ pub enum SysfsError {
 
 pub(crate) unsafe fn sysfs_read_file(path: &str) -> Result<String, SysfsError> {
     let mut file = OpenOptions::new().read(true).open(path).map_err(|e| {
+        // If I use `ErrorKind::NotFound` here it has a wrong syntax error
         if e.kind() == std::io::ErrorKind::NotFound {
             SysfsError::MissingAttribute
         } else {
@@ -36,4 +39,15 @@ pub(crate) unsafe fn sysfs_read_file(path: &str) -> Result<String, SysfsError> {
     let buf = std::str::from_utf8_unchecked(&buf[..bytes_read]);
     let buf = buf.trim_end_matches('\n');
     Ok(buf.to_owned())
+}
+
+pub fn sysfs_parse_list<T>(sysfs_list: &str) -> Vec<T>
+where
+    T: FromStr,
+    T::Err: Debug,
+{
+    sysfs_list
+        .split(' ')
+        .map(|item| item.parse().unwrap())
+        .collect()
 }

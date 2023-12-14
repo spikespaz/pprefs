@@ -6,7 +6,7 @@ pub mod sysfs;
 pub mod cpufreq {
     use std::os::unix::ffi::OsStrExt;
 
-    use crate::sysfs::{sysfs_read_file, Result};
+    use crate::sysfs::{sysfs_parse_list, sysfs_read_file, Result};
 
     static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
 
@@ -37,12 +37,10 @@ pub mod cpufreq {
         // Unsafe is safe because sysfs is all ASCII text.
         // Unwrap is safe because the documentation guarantees a list of space-separated ASCII numbers.
         unsafe {
-            Ok(
-                sysfs_read_file(&format!("{}/policy{}/affected_cpus", SYSFS_DIR, cpu_num))?
-                    .split(' ')
-                    .map(|cpu| cpu.parse().unwrap())
-                    .collect(),
-            )
+            Ok(sysfs_parse_list(&sysfs_read_file(&format!(
+                "{}/policy{}/affected_cpus",
+                SYSFS_DIR, cpu_num
+            ))?))
         }
     }
 }
