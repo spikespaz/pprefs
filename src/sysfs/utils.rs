@@ -35,7 +35,10 @@ pub(crate) unsafe fn sysfs_read_file(path: &str) -> Result<String, SysfsError> {
 
 /// UNSAFE
 macro_rules! impl_sysfs_read {
-    ($vis:vis $attr_name:ident ($fmt_str:literal, $sysfs_dir:ident, $($arg:ident : $arg_ty:ty),*) -> $ret_ty:tt) => {
+    (
+        $(#[$meta:meta])*
+        $vis:vis $attr_name:ident ($fmt_str:literal, $sysfs_dir:ident, $($arg:ident : $arg_ty:ty),*) -> $ret_ty:tt
+    ) => {
         // Allowed because blah blah metavariable expansion syntax error blah blah
         #[allow(unused_parens)]
         $vis fn $attr_name($($arg: $arg_ty,)*) -> $crate::sysfs::Result<$ret_ty> {

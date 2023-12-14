@@ -33,7 +33,11 @@ pub mod cpufreq {
         })
     }
 
-    impl_sysfs_read!(pub affected_cpus("{}/policy{}/{}", SYSFS_DIR, policy: usize) -> (Vec<usize>));
+    impl_sysfs_read!(
+        /// List of online CPUs belonging to this policy (i.e. sharing the hardware performance scaling interface
+        /// represented by the policyX policy object).
+        pub affected_cpus("{}/policy{}/{}", SYSFS_DIR, policy: usize) -> (Vec<usize>)
+    );
 }
 
 fn main() {
