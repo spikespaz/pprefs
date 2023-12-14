@@ -1,6 +1,6 @@
 mod utils;
 
-pub(crate) use utils::{impl_sysfs_read, sysfs_parse_list, sysfs_read_file};
+pub(crate) use utils::{impl_sysfs_read, sysfs_read_file};
 
 pub type Result<T> = std::result::Result<T, SysfsError>;
 
