@@ -1,33 +1,12 @@
-// <https://www.kernel.org/doc/html/latest/filesystems/sysfs.html>
-// <https://www.kernel.org/doc/html/latest/admin-guide/sysfs-rules.html>
-//
-// If you see unchecked string functions being called,
-// it's because *sysfs* is guaranteed to be ASCII (where we expect text).
+// <https://github.com/torvalds/linux/blob/master/tools/power/cpupower/utils/helpers/sysfs.c>
 
-//! The maximum number of bytes that can be read from any given
-//! *sysfs* attribute. Generally there should be nothing larger than this.
-
-const SYSFS_MAX_ATTR_BYTES: usize = 1024;
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("the requested sysfs attribute does not exist")]
-    MissingAttribute,
-    #[error("encountered IO error: {0}")]
-    Io(#[from] std::io::Error),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
+pub mod sysfs;
 
 /// <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#policy-interface-in-sysfs>
 pub mod cpufreq {
-    use std::fs::OpenOptions;
-    use std::io::Read;
     use std::os::unix::ffi::OsStrExt;
 
-    use crate::SYSFS_MAX_ATTR_BYTES;
-
-    use super::Result;
+    use crate::sysfs::{sysfs_read_file, Result};
 
     static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
 
@@ -55,16 +34,16 @@ pub mod cpufreq {
     }
 
     pub fn affected_cpus(cpu_num: usize) -> Result<Vec<usize>> {
-        let sysfs_attr = format!("{}/policy{}/affected_cpus", SYSFS_DIR, cpu_num);
-        let mut file = OpenOptions::new().read(true).open(sysfs_attr)?;
-        let mut buf = [0; SYSFS_MAX_ATTR_BYTES];
-        let bytes_read = file.read(&mut buf)?;
-        // Unchecked conversion is safe because this attribute is ASCII.
-        let content = unsafe { std::str::from_utf8_unchecked(&buf[..bytes_read]) };
-        // I do not think this should be necessary, but evidently it is.
-        let content = content.trim_end_matches('\n');
+        // Unsafe is safe because sysfs is all ASCII text.
         // Unwrap is safe because the documentation guarantees a list of space-separated ASCII numbers.
-        Ok(content.split(' ').map(|cpu| cpu.parse().unwrap()).collect())
+        unsafe {
+            Ok(
+                sysfs_read_file(&format!("{}/policy{}/affected_cpus", SYSFS_DIR, cpu_num))?
+                    .split(' ')
+                    .map(|cpu| cpu.parse().unwrap())
+                    .collect(),
+            )
+        }
     }
 }
 
