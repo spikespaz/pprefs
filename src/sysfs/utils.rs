@@ -33,7 +33,7 @@ pub(crate) unsafe fn sysfs_read_file(path: &str) -> Result<String, SysfsError> {
     Ok(buf.to_owned())
 }
 
-pub fn sysfs_parse_list<T>(sysfs_list: &str) -> Vec<T>
+pub(crate) fn sysfs_parse_list<T>(sysfs_list: &str) -> Vec<T>
 where
     T: FromStr,
     T::Err: Debug,
@@ -43,3 +43,24 @@ where
         .map(|item| item.parse().unwrap())
         .collect()
 }
+
+/// UNSAFE
+macro_rules! impl_sysfs_read {
+    ($vis:vis $attr_name:ident ($fmt_str:literal, $sysfs_dir:ident, $($arg:ident : $arg_ty:ty),*) -> $ret:tt) => {
+        // Allowed because blah blah metavariable expansion syntax error blah blah
+        #[allow(unused_parens)]
+        $vis fn $attr_name($($arg: $arg_ty,)*) -> $crate::sysfs::Result<$ret> {
+            let attr = &format!($fmt_str, $sysfs_dir $(, $arg)*, stringify!($attr_name));
+            let res = unsafe { $crate::sysfs::sysfs_read_file(attr) };
+            $crate::sysfs::impl_sysfs_read!(res, $ret)
+        }
+    };
+    ($res:expr, usize) => {{
+        Ok($string?.parse().unwrap())
+    }};
+    ($res:expr, (Vec< $t:tt >)) => {{
+        Ok($crate::sysfs::sysfs_parse_list(&$res?))
+    }}
+}
+
+pub(crate) use impl_sysfs_read;
