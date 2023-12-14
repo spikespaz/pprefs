@@ -14,6 +14,8 @@ const SYSFS_MAX_ATTR_BYTES: usize = 1024;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SysfsError {
+    /// Kernel documentation says that if you get os error 2 that
+    /// means a feature is unavailable.
     #[error("the requested sysfs attribute does not exist")]
     MissingAttribute,
     #[error("encountered IO error: {0}")]
@@ -21,7 +23,13 @@ pub enum SysfsError {
 }
 
 pub(crate) unsafe fn sysfs_read_file(path: &str) -> Result<String, SysfsError> {
-    let mut file = OpenOptions::new().read(true).open(path)?;
+    let mut file = OpenOptions::new().read(true).open(path).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            SysfsError::MissingAttribute
+        } else {
+            SysfsError::from(e)
+        }
+    })?;
     let mut buf = [0; SYSFS_MAX_ATTR_BYTES];
     let bytes_read = file.read(&mut buf)?;
     // Unchecked conversion is safe because this attribute is ASCII.
