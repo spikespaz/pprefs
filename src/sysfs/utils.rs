@@ -12,22 +12,14 @@ use std::fs::OpenOptions;
 use std::io::{ErrorKind, Read};
 use std::str::FromStr;
 
-const SYSFS_MAX_ATTR_BYTES: usize = 1024;
+use super::SysfsError;
 
-#[derive(Debug, thiserror::Error)]
-pub enum SysfsError {
-    /// Kernel documentation says that if you get os error 2 that
-    /// means a feature is unavailable.
-    #[error("the requested sysfs attribute does not exist")]
-    MissingAttribute,
-    #[error("encountered IO error: {0}")]
-    Io(#[from] std::io::Error),
-}
+const SYSFS_MAX_ATTR_BYTES: usize = 1024;
 
 pub(crate) unsafe fn sysfs_read_file(path: &str) -> Result<String, SysfsError> {
     let mut file = OpenOptions::new().read(true).open(path).map_err(|e| {
-        // If I use `ErrorKind::NotFound` here it has a wrong syntax error
-        if e.kind() == std::io::ErrorKind::NotFound {
+        // Remove this comment to find a funny bug in the Rust parser.
+        if e.kind() == ErrorKind::NotFound {
             SysfsError::MissingAttribute
         } else {
             SysfsError::from(e)
