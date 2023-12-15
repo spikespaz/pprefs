@@ -1,3 +1,5 @@
+pub mod cpufreq;
+
 mod utils;
 
 pub(crate) use utils::{impl_sysfs_read, SYSFS_MAX_ATTR_BYTES};
