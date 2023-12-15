@@ -13,7 +13,9 @@ pub const SYSFS_MAX_ATTR_BYTES: usize = 1024;
 macro_rules! impl_sysfs_read {
     (
         $(#[$meta:meta])*
-        $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* ) in $sysfs_dir:literal -> $ret_ty:tt;
+        $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* )
+            in $sysfs_dir:literal
+            for $parse_ok:expr => $ret_ty:ty;
     ) => {
         // Allowed because blah blah metavariable expansion syntax error blah blah
         #[allow(unused_parens)]
@@ -21,7 +23,7 @@ macro_rules! impl_sysfs_read {
             use std::fs::OpenOptions;
             use std::io::{ErrorKind, Read};
 
-            use $crate::sysfs::{impl_sysfs_read, SysfsError, SYSFS_MAX_ATTR_BYTES};
+            use $crate::sysfs::{SysfsError, SYSFS_MAX_ATTR_BYTES};
 
             let file_path = &format!("{}/{}", format_args!($sysfs_dir), stringify!($attr_name));
             let mut buf = [0; SYSFS_MAX_ATTR_BYTES];
@@ -44,15 +46,9 @@ macro_rules! impl_sysfs_read {
                     }
                 });
 
-            impl_sysfs_read!(result, $ret_ty)
+            result.map($parse_ok)
         }
     };
-    ($result:expr, usize) => {{
-        Ok($result?.parse().unwrap())
-    }};
-    ($result:expr, (Vec< $t:tt >)) => {{
-        Ok($result?.split(' ').map(|item| item.parse().unwrap()).collect())
-    }}
 }
 
 pub(crate) use impl_sysfs_read;
