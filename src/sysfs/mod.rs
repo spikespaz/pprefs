@@ -12,6 +12,10 @@ pub enum SysfsError {
     /// means a feature is unavailable.
     #[error("the requested sysfs attribute does not exist")]
     MissingAttribute,
+    /// Sometimes attributes are unsupported on a platform.
+    #[error("the requested sysfs attribute is not supported on this platform")]
+    UnsupportedAttribute,
+
     #[error("encountered IO error: {0}")]
     Io(#[from] std::io::Error),
 }

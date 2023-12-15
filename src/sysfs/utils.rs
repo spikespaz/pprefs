@@ -55,6 +55,7 @@ macro_rules! impl_sysfs_read {
             $vis fn $attr_name($($arg: $arg_ty),+)
             in $sysfs_dir
             match {
+                Ok(text) if text == "<unsupported>" => Err(SysfsError::UnsupportedAttribute),
                 Ok(text) => Ok($parse_ok(text)),
                 Err(e) if e.kind() == ErrorKind::NotFound => Err(SysfsError::MissingAttribute),
                 Err(e) => Err(SysfsError::from(e))
