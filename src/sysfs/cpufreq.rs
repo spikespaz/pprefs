@@ -34,7 +34,7 @@ impl_sysfs_read!(
     /// hardware performance scaling interface represented by the policyX
     /// policy object).
     pub fn affected_cpus(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>;
 );
 
@@ -54,7 +54,7 @@ impl_sysfs_read!(
     /// This attribute is not present if the scaling driver in use does not
     /// support it.
     pub fn bios_limit(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.parse().unwrap() => usize;
 );
 
@@ -66,7 +66,7 @@ impl_sysfs_read!(
     /// If that frequency cannot be determined, this attribute should not be
     /// present.
     pub fn cpuinfo_cur_freq(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.parse().unwrap() => usize;
 );
 
@@ -74,7 +74,7 @@ impl_sysfs_read!(
     /// Maximum possible operating frequency the CPUs belonging to this
     /// policy can run at (in kHz).
     pub fn cpuinfo_max_freq(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.parse().unwrap() => usize;
 );
 
@@ -82,7 +82,7 @@ impl_sysfs_read!(
     /// Minimum possible operating frequency the CPUs belonging to this
     /// policy can run at (in kHz).
     pub fn cpuinfo_min_freq(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.parse().unwrap() => usize;
 );
 
@@ -94,14 +94,14 @@ impl_sysfs_read!(
     /// not work with the ondemand governor, -1 (CPUFREQ_ETERNAL) will be
     /// returned by reads from this attribute.
     pub fn cpuinfo_transition_latency(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.parse().unwrap() => isize;
 );
 
 impl_sysfs_read!(
     /// List of all (online and offline) CPUs belonging to this policy.
     pub fn related_cpus(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>;
 );
 
@@ -115,7 +115,7 @@ impl_sysfs_read!(
     /// load a kernel module for the governor held by it to become available
     /// and be listed by this attribute.]
     pub fn scaling_available_governors(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.split(' ').map(ToOwned::to_owned).collect() => Vec<String>;
 );
 
@@ -134,14 +134,14 @@ impl_sysfs_read!(
     /// attribute, but that still may not be the exact current CPU frequency
     /// as seen by the hardware at the moment.
     pub fn scaling_cur_freq(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.parse().unwrap() => usize;
 );
 
 impl_sysfs_read!(
     /// The scaling driver currently in use.
     pub fn scaling_driver(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for ToOwned::to_owned => String;
 );
 
@@ -157,7 +157,7 @@ impl_sysfs_read!(
     /// attribute (which must be one of the names listed by the
     /// scaling_available_governors attribute described above).
     pub fn scaling_governor(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for ToOwned::to_owned => String;
 );
 
@@ -169,7 +169,7 @@ impl_sysfs_read!(
     /// integer to it will cause a new limit to be set (it must not be lower
     /// than the value of the scaling_min_freq attribute).
     pub fn scaling_max_freq(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.parse().unwrap() => usize;
 );
 
@@ -181,7 +181,7 @@ impl_sysfs_read!(
     /// non-negative integer to it will cause a new limit to be set (it must
     /// not be higher than the value of the scaling_max_freq attribute).
     pub fn scaling_min_freq(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.parse().unwrap() => usize;
 );
 
@@ -192,6 +192,6 @@ impl_sysfs_read!(
     /// It returns the last frequency requested by the governor (in kHz) or
     /// can be written to in order to set a new frequency for the policy.
     pub fn scaling_setspeed(cpu: usize)
-        in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
+        in "{SYSFS_DIR}/policy{cpu}"
         for |text: &str| text.parse().unwrap() => usize;
 );
