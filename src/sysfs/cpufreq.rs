@@ -3,7 +3,7 @@ use std::os::unix::ffi::OsStrExt;
 
 use super::{impl_sysfs_read, Result};
 
-static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
+pub static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
 
 pub fn num_policies() -> Result<usize> {
     let policy_prefix = "policy".as_bytes();
