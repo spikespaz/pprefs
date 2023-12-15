@@ -34,9 +34,8 @@ macro_rules! impl_sysfs_read {
                     let bytes_read = f.read(&mut buf)?;
                     // SAFETY: Linux guarantees that all of *sysfs* is valid ASCII.
                     let buf = unsafe { std::str::from_utf8_unchecked(&buf[..bytes_read]) };
-                    // Unchecked conversion is safe because this attribute is ASCII.
                     let buf = buf.trim_end_matches('\n');
-                    Ok(buf.to_owned())
+                    Ok(buf)
                 })
                 .map_err(|e| {
                     if e.kind() == ErrorKind::NotFound {
