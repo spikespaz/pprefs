@@ -13,7 +13,7 @@ pub const SYSFS_MAX_ATTR_BYTES: usize = 1024;
 macro_rules! impl_sysfs_read {
     (
         $(#[$meta:meta])*
-        $vis:vis $attr_name:ident ($fmt_str:literal, $sysfs_dir:ident, $($arg:ident : $arg_ty:ty),*) -> $ret_ty:tt
+        $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* ) in $sysfs_dir:literal -> $ret_ty:tt;
     ) => {
         // Allowed because blah blah metavariable expansion syntax error blah blah
         #[allow(unused_parens)]
@@ -23,7 +23,7 @@ macro_rules! impl_sysfs_read {
 
             use $crate::sysfs::{impl_sysfs_read, SysfsError, SYSFS_MAX_ATTR_BYTES};
 
-            let file_path = &format!($fmt_str, $sysfs_dir $(, $arg)*, stringify!($attr_name));
+            let file_path = &format!("{}/{}", format_args!($sysfs_dir), stringify!($attr_name));
             let mut buf = [0; SYSFS_MAX_ATTR_BYTES];
             let result = OpenOptions::new()
                 .read(true)
@@ -37,13 +37,13 @@ macro_rules! impl_sysfs_read {
                     Ok(buf.to_owned())
                 })
                 .map_err(|e| {
-                    //
                     if e.kind() == ErrorKind::NotFound {
                         SysfsError::MissingAttribute
                     } else {
                         SysfsError::from(e)
                     }
                 });
+
             impl_sysfs_read!(result, $ret_ty)
         }
     };
