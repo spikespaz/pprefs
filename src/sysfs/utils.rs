@@ -15,17 +15,18 @@ macro_rules! impl_sysfs_read {
         $(#[$meta:meta])*
         $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* )
             in $sysfs_dir:literal
-            for $parse_ok:expr => $ret_ty:ty;
+            match {
+                $($arm_pat:pat $(if $arm_cond:expr)? => $arm_expr:expr),+
+            } => $result_ty:ty;
     ) => {
-        // Allowed because blah blah metavariable expansion syntax error blah blah
-        #[allow(unused_parens)]
-        $vis fn $attr_name($($arg: $arg_ty,)*) -> $crate::sysfs::Result<$ret_ty> {
+        $vis fn $attr_name($($arg: $arg_ty,)*) -> $result_ty {
             use std::fs::OpenOptions;
             use std::io::{ErrorKind, Read};
 
             use $crate::sysfs::{SysfsError, SYSFS_MAX_ATTR_BYTES};
 
             let file_path = &format!("{}/{}", format_args!($sysfs_dir), stringify!($attr_name));
+
             let mut buf = [0; SYSFS_MAX_ATTR_BYTES];
             let result = OpenOptions::new()
                 .read(true)
@@ -36,17 +37,29 @@ macro_rules! impl_sysfs_read {
                     let buf = unsafe { std::str::from_utf8_unchecked(&buf[..bytes_read]) };
                     let buf = buf.trim_end_matches('\n');
                     Ok(buf)
-                })
-                .map_err(|e| {
-                    if e.kind() == ErrorKind::NotFound {
-                        SysfsError::MissingAttribute
-                    } else {
-                        SysfsError::from(e)
-                    }
                 });
 
-            result.map($parse_ok)
+            #[allow(clippy::redundant_closure_call)]
+            match result {
+                $($arm_pat $(if $arm_cond)? => $arm_expr),+
+            }
         }
+    };
+    (
+        $(#[$meta:meta])*
+        $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* )
+            in $sysfs_dir:literal
+            for $parse_ok:expr => $ok_ty:ty;
+    ) => {
+        $crate::sysfs::impl_sysfs_read!(
+            $vis fn $attr_name($($arg: $arg_ty),+)
+            in $sysfs_dir
+            match {
+                Ok(text) => Ok($parse_ok(text)),
+                Err(e) if e.kind() == ErrorKind::NotFound => Err(SysfsError::MissingAttribute),
+                Err(e) => Err(SysfsError::from(e))
+            } => $crate::sysfs::Result<$ok_ty>;
+        );
     };
 }
 

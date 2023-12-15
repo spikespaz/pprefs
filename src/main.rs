@@ -38,7 +38,12 @@ pub mod cpufreq {
         /// represented by the policyX policy object).
         pub fn affected_cpus(cpu: usize)
             in "/sys/devices/system/cpu/cpufreq/policy{cpu}"
-            for |text| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>;
+            // match {
+            //     Ok(text) => Ok(text.split(' ').map(|int| int.parse().unwrap()).collect()),
+            //     Err(ref e) if e.kind() == ErrorKind::NotFound => Err(SysfsError::MissingAttribute),
+            //     Err(e) => Err(SysfsError::from(e))
+            // } => Result<Vec<usize>>;
+            for |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>;
     );
 }
 
