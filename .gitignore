@@ -4,3 +4,7 @@
 # Nix
 /result
 /result-man
+
+# Project
+/scratch.rs
+
