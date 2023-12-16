@@ -38,7 +38,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/affected_cpus`
         /// *sysfs* attribute.**
-        read: |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>,
+        read: |text| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>,
     }
 
     /// If the platform firmware (BIOS) tells the OS to apply an upper limit
@@ -58,7 +58,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/bios_limit`
         /// *sysfs* attribute.**
-        read: |text: &str| text.parse().unwrap() => usize,
+        read: |text| text.parse().unwrap() => usize,
     }
 
     /// Current frequency of the CPUs belonging to this policy as obtained
@@ -71,7 +71,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/cpuinfo_cur_freq`
         /// *sysfs* attribute.**
-        read: |text: &str| text.parse().unwrap() => usize,
+        read: |text| text.parse().unwrap() => usize,
     }
 
     /// Maximum possible operating frequency the CPUs belonging to this
@@ -80,7 +80,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/cpuinfo_max_freq`
         /// *sysfs* attribute.**
-        read: |text: &str| text.parse().unwrap() => usize,
+        read: |text| text.parse().unwrap() => usize,
     }
 
     /// Minimum possible operating frequency the CPUs belonging to this
@@ -89,7 +89,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/cpuinfo_min_freq`
         /// *sysfs* attribute.**
-        read: |text: &str| text.parse().unwrap() => usize,
+        read: |text| text.parse().unwrap() => usize,
     }
 
     /// The time it takes to switch the CPUs belonging to this policy from
@@ -102,7 +102,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/cpuinfo_transition_latency`
         /// *sysfs* attribute.**
-        read: |text: &str| text.parse().unwrap() => isize,
+        read: |text| text.parse().unwrap() => isize,
     }
 
     /// List of all (online and offline) CPUs belonging to this policy.
@@ -110,7 +110,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/related_cpus`
         /// *sysfs* attribute.**
-        read: |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>,
+        read: |text| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>,
     }
 
     /// List of CPUFreq scaling governors present in the kernel that can be
@@ -125,7 +125,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_available_governors`
         /// *sysfs* attribute.**
-        read: |text: &str| text.split(' ').map(ToOwned::to_owned).collect() => Vec<String>,
+        read: |text| text.split(' ').map(ToOwned::to_owned).collect() => Vec<String>,
     }
 
     /// Current frequency of all of the CPUs belonging to this policy
@@ -145,7 +145,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_cur_freq`
         /// *sysfs* attribute.**
-        read: |text: &str| text.parse().unwrap() => usize,
+        read: |text| text.parse().unwrap() => usize,
     }
 
     /// The scaling driver currently in use.
@@ -183,7 +183,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq`
         /// *sysfs* attribute.**
-        read: |text: &str| text.parse().unwrap() => usize,
+        read: |text| text.parse().unwrap() => usize,
     }
 
     /// Minimum frequency the CPUs belonging to this policy are allowed to
@@ -196,7 +196,7 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_min_freq`
         /// *sysfs* attribute.**
-        read: |text: &str| text.parse().unwrap() => usize,
+        read: |text| text.parse().unwrap() => usize,
     }
 
     /// This attribute is functional only if the userspace scaling governor
@@ -208,6 +208,6 @@ impl_sysfs_attrs!(
         /// **This is the getter function for the
         /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_setspeed`
         /// *sysfs* attribute.**
-        read: |text: &str| text.parse().unwrap() => usize,
+        read: |text| text.parse().unwrap() => usize,
     }
 );

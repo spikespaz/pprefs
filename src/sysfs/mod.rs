@@ -2,7 +2,7 @@ pub mod cpufreq;
 
 mod utils;
 
-pub(crate) use utils::{impl_sysfs_attrs, impl_sysfs_read, SYSFS_MAX_ATTR_BYTES};
+pub(crate) use utils::{impl_sysfs_attrs, sysfs_read, SYSFS_MAX_ATTR_BYTES};
 
 pub type Result<T> = std::result::Result<T, SysfsError>;
 
