@@ -7,7 +7,7 @@
 // The maximum number of bytes that can be read from any given
 // *sysfs* attribute. Generally there should be nothing larger than this.
 
-use std::fmt::Display;
+use std::fmt;
 use std::fs::OpenOptions;
 use std::io::{ErrorKind, Read as _, Write as _};
 
@@ -40,20 +40,16 @@ pub(crate) unsafe fn sysfs_read<T>(file_path: &str, parse_ok: fn(&str) -> T) -> 
     }
 }
 
-/// This is a low-level function which only expects that `V: Display`. It does
-/// not validate the value after formatting, so ensure that the `value` has a
-/// sufficient `Display` implementation that will produce a string appropriate
-/// for the *sysfs* attribute.
-pub(crate) fn sysfs_write<V>(file_path: &str, value: V) -> Result<()>
-where
-    V: Display,
-{
+/// This is a low-level function which opens a file and writes
+/// [`std::fmt::Arguments`] and wraps error handling. It does not validate, so
+/// ensure that your input is appropriate for the *sysfs* attribute in question.
+pub(crate) fn sysfs_write(file_path: &str, fmt_args: fmt::Arguments<'_>) -> Result<()> {
     OpenOptions::new()
         .read(false)
         .write(true)
         .create(false)
         .open(file_path)
-        .and_then(|mut f| write!(f, "{}", value))
+        .and_then(|mut f| f.write_fmt(fmt_args))
         .map_err(|e| {
             if e.kind() == ErrorKind::NotFound {
                 SysfsError::MissingAttribute
