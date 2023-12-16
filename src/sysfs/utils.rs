@@ -12,17 +12,23 @@ pub const SYSFS_MAX_ATTR_BYTES: usize = 1024;
 macro_rules! impl_sysfs_attrs {
     () => {};
     (
-        $(#[$meta:meta])*
+        $(#[$attr_meta:meta])*
         $vis:vis sysfs_attr $attr_name:ident ($($arg_ident:ident : $arg_ty:ty),*)
         in $sysfs_dir:literal {
+            $(#[$getter_meta:meta])*
             read: $read_op:expr => $read_ty:ty,
-            $(write: $write_op:expr,)?
+        // $(
+        //     $(#[$setter_meta:meta])*
+        //     write: $write_op:expr,
+        // )?
         }
 
         $($tail:tt)*
     ) => {
         $crate::sysfs::impl_sysfs_read!(
-            $(#[$meta])*
+            $(#[$attr_meta])*
+            #[doc = ""]
+            $(#[$getter_meta])*
             $vis fn $attr_name ($($arg_ident : $arg_ty),*)
                 in $sysfs_dir
                 for $read_op => $read_ty;
