@@ -9,6 +9,31 @@
 
 pub const SYSFS_MAX_ATTR_BYTES: usize = 1024;
 
+macro_rules! impl_sysfs_attrs {
+    () => {};
+    (
+        $(#[$meta:meta])*
+        $vis:vis sysfs_attr $attr_name:ident ($($arg_ident:ident : $arg_ty:ty),*)
+        in $sysfs_dir:literal {
+            read: $read_op:expr => $read_ty:ty,
+            $(write: $write_op:expr,)?
+        }
+
+        $($tail:tt)*
+    ) => {
+        $crate::sysfs::impl_sysfs_read!(
+            $(#[$meta])*
+            $vis fn $attr_name ($($arg_ident : $arg_ty),*)
+                in $sysfs_dir
+                for $read_op => $read_ty;
+        );
+
+        $crate::sysfs::impl_sysfs_attrs!($($tail)*);
+    };
+}
+
+pub(crate) use impl_sysfs_attrs;
+
 /// UNSAFE
 macro_rules! impl_sysfs_read {
     () => {};
@@ -19,8 +44,6 @@ macro_rules! impl_sysfs_read {
             match {
                 $($arm_pat:pat $(if $arm_cond:expr)? => $arm_expr:expr),+
             } => $result_ty:ty;
-
-        $($tail:tt)*
     ) => {
         $(#[$meta])*
         $vis fn $attr_name($($arg: $arg_ty,)*) -> $result_ty {
@@ -48,16 +71,12 @@ macro_rules! impl_sysfs_read {
                 $($arm_pat $(if $arm_cond)? => $arm_expr),+
             }
         }
-
-        $crate::sysfs::impl_sysfs_read!($($tail)*);
     };
     (
         $(#[$meta:meta])*
         $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* )
             in $sysfs_dir:literal
             for $parse_ok:expr => $ok_ty:ty;
-
-        $($tail:tt)*
     ) => {
         $crate::sysfs::impl_sysfs_read!(
             $(#[$meta])*
@@ -69,8 +88,6 @@ macro_rules! impl_sysfs_read {
                 Err(e) if e.kind() == ErrorKind::NotFound => Err(SysfsError::MissingAttribute),
                 Err(e) => Err(SysfsError::from(e))
             } => $crate::sysfs::Result<$ok_ty>;
-
-            $($tail)*
         );
     };
 }

@@ -1,7 +1,8 @@
 //! <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#policy-interface-in-sysfs>
 use std::os::unix::ffi::OsStrExt;
 
-use super::{impl_sysfs_read, Result};
+use super::utils::impl_sysfs_attrs;
+use super::Result;
 
 pub static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
 
@@ -29,13 +30,13 @@ pub fn num_policies() -> Result<usize> {
     })
 }
 
-impl_sysfs_read!(
+impl_sysfs_attrs!(
     /// List of online CPUs belonging to this policy (i.e. sharing the
     /// hardware performance scaling interface represented by the policyX
     /// policy object).
-    pub fn affected_cpus(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>;
+    pub sysfs_attr affected_cpus(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>,
+    }
 
     /// If the platform firmware (BIOS) tells the OS to apply an upper limit
     /// to CPU frequencies, that limit will be reported through this
@@ -50,9 +51,9 @@ impl_sysfs_read!(
     ///
     /// This attribute is not present if the scaling driver in use does not
     /// support it.
-    pub fn bios_limit(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.parse().unwrap() => usize;
+    pub sysfs_attr bios_limit(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.parse().unwrap() => usize,
+    }
 
     /// Current frequency of the CPUs belonging to this policy as obtained
     /// from the hardware (in KHz).
@@ -60,21 +61,21 @@ impl_sysfs_read!(
     /// This is expected to be the frequency the hardware actually runs at.
     /// If that frequency cannot be determined, this attribute should not be
     /// present.
-    pub fn cpuinfo_cur_freq(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.parse().unwrap() => usize;
+    pub sysfs_attr cpuinfo_cur_freq(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.parse().unwrap() => usize,
+    }
 
     /// Maximum possible operating frequency the CPUs belonging to this
     /// policy can run at (in kHz).
-    pub fn cpuinfo_max_freq(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.parse().unwrap() => usize;
+    pub sysfs_attr cpuinfo_max_freq(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.parse().unwrap() => usize,
+    }
 
     /// Minimum possible operating frequency the CPUs belonging to this
     /// policy can run at (in kHz).
-    pub fn cpuinfo_min_freq(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.parse().unwrap() => usize;
+    pub sysfs_attr cpuinfo_min_freq(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.parse().unwrap() => usize,
+    }
 
     /// The time it takes to switch the CPUs belonging to this policy from
     /// one P-state to another, in nanoseconds.
@@ -82,14 +83,14 @@ impl_sysfs_read!(
     /// If unknown or if known to be so high that the scaling driver does
     /// not work with the ondemand governor, -1 (CPUFREQ_ETERNAL) will be
     /// returned by reads from this attribute.
-    pub fn cpuinfo_transition_latency(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.parse().unwrap() => isize;
+    pub sysfs_attr cpuinfo_transition_latency(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.parse().unwrap() => isize,
+    }
 
     /// List of all (online and offline) CPUs belonging to this policy.
-    pub fn related_cpus(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>;
+    pub sysfs_attr related_cpus(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect() => Vec<usize>,
+    }
 
     /// List of CPUFreq scaling governors present in the kernel that can be
     /// attached to this policy or (if the intel_pstate scaling driver is in
@@ -99,9 +100,9 @@ impl_sysfs_read!(
     /// [Note that some governors are modular and it may be necessary to
     /// load a kernel module for the governor held by it to become available
     /// and be listed by this attribute.]
-    pub fn scaling_available_governors(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.split(' ').map(ToOwned::to_owned).collect() => Vec<String>;
+    pub sysfs_attr scaling_available_governors(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.split(' ').map(ToOwned::to_owned).collect() => Vec<String>,
+    }
 
     /// Current frequency of all of the CPUs belonging to this policy
     /// (in kHz).
@@ -116,14 +117,14 @@ impl_sysfs_read!(
     /// more precisely reflecting the current CPU frequency through this
     /// attribute, but that still may not be the exact current CPU frequency
     /// as seen by the hardware at the moment.
-    pub fn scaling_cur_freq(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.parse().unwrap() => usize;
+    pub sysfs_attr scaling_cur_freq(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.parse().unwrap() => usize,
+    }
 
     /// The scaling driver currently in use.
-    pub fn scaling_driver(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for ToOwned::to_owned => String;
+    pub sysfs_attr scaling_driver(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: ToOwned::to_owned => String,
+    }
 
     /// The scaling governor currently attached to this policy or (if the
     /// intel_pstate scaling driver is in use) the scaling algorithm
@@ -135,9 +136,9 @@ impl_sysfs_read!(
     /// intel_pstate case), as indicated by the string written to this
     /// attribute (which must be one of the names listed by the
     /// scaling_available_governors attribute described above).
-    pub fn scaling_governor(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for ToOwned::to_owned => String;
+    pub sysfs_attr scaling_governor(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: ToOwned::to_owned => String,
+    }
 
     /// Maximum frequency the CPUs belonging to this policy are allowed to
     /// be running at (in kHz).
@@ -145,9 +146,9 @@ impl_sysfs_read!(
     /// This attribute is read-write and writing a string representing an
     /// integer to it will cause a new limit to be set (it must not be lower
     /// than the value of the scaling_min_freq attribute).
-    pub fn scaling_max_freq(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.parse().unwrap() => usize;
+    pub sysfs_attr scaling_max_freq(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.parse().unwrap() => usize,
+    }
 
     /// Minimum frequency the CPUs belonging to this policy are allowed to
     /// be running at (in kHz).
@@ -155,16 +156,16 @@ impl_sysfs_read!(
     /// This attribute is read-write and writing a string representing a
     /// non-negative integer to it will cause a new limit to be set (it must
     /// not be higher than the value of the scaling_max_freq attribute).
-    pub fn scaling_min_freq(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.parse().unwrap() => usize;
+    pub sysfs_attr scaling_min_freq(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.parse().unwrap() => usize,
+    }
 
     /// This attribute is functional only if the userspace scaling governor
     /// is attached to the given policy.
     ///
     /// It returns the last frequency requested by the governor (in kHz) or
     /// can be written to in order to set a new frequency for the policy.
-    pub fn scaling_setspeed(cpu: usize)
-        in "{SYSFS_DIR}/policy{cpu}"
-        for |text: &str| text.parse().unwrap() => usize;
+    pub sysfs_attr scaling_setspeed(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: |text: &str| text.parse().unwrap() => usize,
+    }
 );
