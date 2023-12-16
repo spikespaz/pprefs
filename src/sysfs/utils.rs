@@ -63,24 +63,20 @@ pub(crate) fn sysfs_write(file_path: &str, fmt_args: fmt::Arguments<'_>) -> Resu
 /// and validated before end-user runtime.
 macro_rules! impl_sysfs_attrs {
     () => {};
+    // Read-only
     (
         $(#[$attr_meta:meta])*
         $vis:vis sysfs_attr $attr_name:ident ($($arg_ident:ident : $arg_ty:ty),*)
         in $sysfs_dir:literal {
-            $(#[$getter_meta:meta])*
+            $(#[$read_meta:meta])*
             read: $parse_ok:expr => $read_ty:ty,
-        // $(
-        //     $(#[$setter_meta:meta])*
-        //     write: $write_op:expr,
-        // )?
         }
 
         $($tail:tt)*
     ) => {
-
         $(#[$attr_meta])*
         #[doc = ""]
-        $(#[$getter_meta])*
+        $(#[$read_meta])*
         $vis fn $attr_name ($($arg_ident : $arg_ty),*) -> $crate::sysfs::Result<$read_ty> {
             let file_path = format!("{}/{}", format_args!($sysfs_dir), stringify!($attr_name));
             unsafe {
@@ -88,7 +84,43 @@ macro_rules! impl_sysfs_attrs {
             }
         }
 
-        $crate::sysfs::impl_sysfs_attrs!($($tail)*);
+        $crate::sysfs::impl_sysfs_attrs! { $($tail)* }
+    };
+    // Read-write
+    (
+        $(#[$attr_meta:meta])*
+        $vis:vis sysfs_attr $attr_name:ident ($($arg_ident:ident : $arg_ty:ty),*)
+        in $sysfs_dir:literal {
+            $(#[$read_meta:meta])*
+            read: $parse_ok:expr => $read_ty:ty,
+            $(#[$write_meta:meta])*
+            write: | $val_ident:ident : $val_ty:ty | -> $fmt_args:expr,
+        }
+
+        $($tail:tt)*
+    ) => {
+        // Getter
+        $crate::sysfs::impl_sysfs_attrs! {
+            $(#[$attr_meta])*
+            $vis sysfs_attr $attr_name ($($arg_ident : $arg_ty),*)
+            in $sysfs_dir {
+                $(#[$read_meta])*
+                read: $parse_ok => $read_ty,
+            }
+        }
+
+        // Setter
+        paste::paste! {
+            $(#[$attr_meta])*
+            #[doc = ""]
+            $(#[$write_meta])*
+            $vis fn [< set_ $attr_name >] ($($arg_ident: $arg_ty,)* $val_ident: $val_ty) -> $crate::sysfs::Result<()> {
+                let file_path = format!("{}/{}", format_args!($sysfs_dir), stringify!($attr_name));
+                $crate::sysfs::sysfs_write(&file_path, $fmt_args)
+            }
+        }
+
+        $crate::sysfs::impl_sysfs_attrs! { $($tail)* }
     };
 }
 

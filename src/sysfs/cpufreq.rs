@@ -30,7 +30,7 @@ pub fn num_policies() -> Result<usize> {
     })
 }
 
-impl_sysfs_attrs!(
+impl_sysfs_attrs! {
     /// List of online CPUs belonging to this policy (i.e. sharing the
     /// hardware performance scaling interface represented by the policyX
     /// policy object).
@@ -171,6 +171,10 @@ impl_sysfs_attrs!(
         /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_governor`
         /// *sysfs* attribute.**
         read: ToOwned::to_owned => String,
+        /// **This is the setter function for the
+        /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_governor`
+        /// *sysfs* attribute.**
+        write: |gov: &str| -> format_args!("{}", gov),
     }
 
     /// Maximum frequency the CPUs belonging to this policy are allowed to
@@ -184,6 +188,10 @@ impl_sysfs_attrs!(
         /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq`
         /// *sysfs* attribute.**
         read: |text| text.parse().unwrap() => usize,
+        /// **This is the setter function for the
+        /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq`
+        /// *sysfs* attribute.**
+        write: |freq: usize| -> format_args!("{}", freq),
     }
 
     /// Minimum frequency the CPUs belonging to this policy are allowed to
@@ -197,6 +205,10 @@ impl_sysfs_attrs!(
         /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_min_freq`
         /// *sysfs* attribute.**
         read: |text| text.parse().unwrap() => usize,
+        /// **This is the setter function for the
+        /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_min_freq`
+        /// *sysfs* attribute.**
+        write: |freq: usize| -> format_args!("{}", freq),
     }
 
     /// This attribute is functional only if the userspace scaling governor
@@ -209,5 +221,9 @@ impl_sysfs_attrs!(
         /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_setspeed`
         /// *sysfs* attribute.**
         read: |text| text.parse().unwrap() => usize,
+        /// **This is the setter function for the
+        /// `/sys/devices/system/cpu/cpufreq/policy*/scaling_setspeed`
+        /// *sysfs* attribute.**
+        write: |freq: usize| -> format_args!("{}", freq),
     }
-);
+}
