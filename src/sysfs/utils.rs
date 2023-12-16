@@ -22,6 +22,7 @@ macro_rules! impl_sysfs_read {
 
         $($tail:tt)*
     ) => {
+        $(#[$meta])*
         $vis fn $attr_name($($arg: $arg_ty,)*) -> $result_ty {
             use std::fs::OpenOptions;
             use std::io::{ErrorKind, Read};
@@ -59,7 +60,8 @@ macro_rules! impl_sysfs_read {
         $($tail:tt)*
     ) => {
         $crate::sysfs::impl_sysfs_read!(
-            $vis fn $attr_name($($arg: $arg_ty),+)
+            $(#[$meta])*
+            $vis fn $attr_name($($arg: $arg_ty),*)
             in $sysfs_dir
             match {
                 Ok(text) if text == "<unsupported>" => Err(SysfsError::UnsupportedAttribute),
