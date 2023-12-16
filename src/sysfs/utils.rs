@@ -47,12 +47,10 @@ macro_rules! impl_sysfs_read {
         $(#[$meta:meta])*
         $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* )
             in $sysfs_dir:literal
-            match {
-                $($arm_pat:pat $(if $arm_cond:expr)? => $arm_expr:expr),+
-            } => $result_ty:ty;
+            for $parse_ok:expr => $ok_ty:ty;
     ) => {
         $(#[$meta])*
-        $vis fn $attr_name($($arg: $arg_ty,)*) -> $result_ty {
+        $vis fn $attr_name($($arg: $arg_ty,)*) -> $crate::sysfs::Result<$ok_ty> {
             use std::fs::OpenOptions;
             use std::io::{ErrorKind, Read};
 
@@ -74,27 +72,12 @@ macro_rules! impl_sysfs_read {
 
             #[allow(clippy::redundant_closure_call)]
             match result {
-                $($arm_pat $(if $arm_cond)? => $arm_expr),+
-            }
-        }
-    };
-    (
-        $(#[$meta:meta])*
-        $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* )
-            in $sysfs_dir:literal
-            for $parse_ok:expr => $ok_ty:ty;
-    ) => {
-        $crate::sysfs::impl_sysfs_read!(
-            $(#[$meta])*
-            $vis fn $attr_name($($arg: $arg_ty),*)
-            in $sysfs_dir
-            match {
                 Ok(text) if text == "<unsupported>" => Err(SysfsError::UnsupportedAttribute),
                 Ok(text) => Ok($parse_ok(text)),
                 Err(e) if e.kind() == ErrorKind::NotFound => Err(SysfsError::MissingAttribute),
                 Err(e) => Err(SysfsError::from(e))
-            } => $crate::sysfs::Result<$ok_ty>;
-        );
+            }
+        }
     };
 }
 
