@@ -11,6 +11,7 @@ pub const SYSFS_MAX_ATTR_BYTES: usize = 1024;
 
 /// UNSAFE
 macro_rules! impl_sysfs_read {
+    () => {};
     (
         $(#[$meta:meta])*
         $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* )
@@ -18,6 +19,8 @@ macro_rules! impl_sysfs_read {
             match {
                 $($arm_pat:pat $(if $arm_cond:expr)? => $arm_expr:expr),+
             } => $result_ty:ty;
+
+        $($tail:tt)*
     ) => {
         $vis fn $attr_name($($arg: $arg_ty,)*) -> $result_ty {
             use std::fs::OpenOptions;
@@ -44,12 +47,16 @@ macro_rules! impl_sysfs_read {
                 $($arm_pat $(if $arm_cond)? => $arm_expr),+
             }
         }
+
+        $crate::sysfs::impl_sysfs_read!($($tail)*);
     };
     (
         $(#[$meta:meta])*
         $vis:vis fn $attr_name:ident ( $($arg:ident : $arg_ty:ty),* )
             in $sysfs_dir:literal
             for $parse_ok:expr => $ok_ty:ty;
+
+        $($tail:tt)*
     ) => {
         $crate::sysfs::impl_sysfs_read!(
             $vis fn $attr_name($($arg: $arg_ty),+)
@@ -60,6 +67,8 @@ macro_rules! impl_sysfs_read {
                 Err(e) if e.kind() == ErrorKind::NotFound => Err(SysfsError::MissingAttribute),
                 Err(e) => Err(SysfsError::from(e))
             } => $crate::sysfs::Result<$ok_ty>;
+
+            $($tail)*
         );
     };
 }
