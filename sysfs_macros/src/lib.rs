@@ -1,10 +1,16 @@
 #![allow(dead_code)]
 
-use proc_macro2::Span;
+use proc_macro::TokenStream;
+use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::token::{Comma, In};
-use syn::{braced, parenthesized, Attribute, Error, FnArg, Ident, Lit, LitStr, Visibility};
+use syn::spanned::Spanned;
+use syn::token::{Colon, Comma, In};
+use syn::{
+    braced, parenthesized, parse_macro_input, Attribute, Block, Error, Expr, ExprClosure, Field,
+    Fields, FieldsNamed, FnArg, Ident, Lit, LitStr, Pat, PatIdent, PatType, ReturnType, Type,
+    Visibility,
+};
 
 mod kw {
     syn::custom_keyword!(sysfs_attr);
@@ -13,14 +19,12 @@ mod kw {
 }
 
 struct SysfsAttribute {
-    span: Span,
     meta_attrs: Vec<Attribute>,
     fn_vis: Visibility,
     attr_name: Ident,
     attr_path_args: Punctuated<FnArg, Comma>,
     sysfs_dir: LitStr,
-    getter: Option<()>,
-    setter: Option<()>,
+    getter: Option<GetterFunction>,
 }
 
 impl Parse for SysfsAttribute {
@@ -41,15 +45,43 @@ impl Parse for SysfsAttribute {
         let braced;
         braced!(braced in input);
 
+        let getter = if braced.peek(kw::read) {
+            kw::read::parse(&braced)?;
+            Colon::parse(&braced)?;
+            Some(braced.parse()?)
+        } else {
+            None
+        };
+
+        if getter.is_some() {
+            Comma::parse(&braced)?;
+        }
+
         Ok(Self {
-            span: input.span(),
             meta_attrs,
             fn_vis,
             attr_name,
             attr_path_args,
             sysfs_dir,
-            getter: None,
-            setter: None,
+            getter,
+        })
+    }
+}
+
+struct GetterFunction {
+    parse_fn: ExprClosure,
+    into_type: ReturnType,
+}
+
+impl Parse for GetterFunction {
+    #[rustfmt::skip]
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Expr::parse(input).and_then(|expr| match &expr {
+            Expr::Closure(closure) => Ok(Self {
+                parse_fn: closure.clone(),
+                into_type: closure.output.clone(),
+            }),
+            _ => Err(Error::new(expr.span(), "expected a function closure")),
         })
     }
 }
@@ -62,8 +94,8 @@ mod tests {
 
     #[rustfmt::skip]
     macro_rules! test_parse {
-        ($input:expr) => {{
-            let result: syn::Result<SysfsAttribute> = syn::parse_str(&($input).to_string());
+        ($parse_ty:ty, $input:expr) => {{
+            let result: syn::Result<$parse_ty> = syn::parse_str(&($input).to_string());
             if let Err(e) = result {
                 panic!("{}", e.to_string());
             }
@@ -71,9 +103,22 @@ mod tests {
     }
 
     #[test]
-    fn empty_sysfs_attr_compiles() {
-        test_parse!(quote! {
-            pub sysfs_attr some_useless_attr(item: usize) in "/fake/sysfs/path/item{item}" {}
-        });
+    fn empty_sysfs_attr_parses() {
+        test_parse!(
+            SysfsAttribute,
+            quote! {
+                pub sysfs_attr some_useless_attr(item: usize) in "/fake/sysfs/path/item{item}" {}
+            }
+        );
+    }
+
+    #[test]
+    fn getter_closure_parses() {
+        test_parse!(
+            GetterFunction,
+            quote! {
+                |text| text.parse().unwrap()
+            }
+        )
     }
 }
