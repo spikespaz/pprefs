@@ -77,14 +77,14 @@ macro_rules! impl_sysfs_attrs {
         $(#[$attr_meta])*
         #[doc = ""]
         $(#[$read_meta])*
-        $vis fn $attr_name ($($arg_ident : $arg_ty),*) -> $crate::sysfs::Result<$read_ty> {
+        $vis fn $attr_name ($($arg_ident : $arg_ty),*) -> $crate::Result<$read_ty> {
             let file_path = format!("{}/{}", format_args!($sysfs_dir), stringify!($attr_name));
             unsafe {
-                $crate::sysfs::sysfs_read::< $read_ty >(&file_path, $parse_ok)
+                $crate::sysfs_read::< $read_ty >(&file_path, $parse_ok)
             }
         }
 
-        $crate::sysfs::impl_sysfs_attrs! { $($tail)* }
+        $crate::impl_sysfs_attrs! { $($tail)* }
     };
     // Read-write
     (
@@ -100,7 +100,7 @@ macro_rules! impl_sysfs_attrs {
         $($tail:tt)*
     ) => {
         // Getter
-        $crate::sysfs::impl_sysfs_attrs! {
+        $crate::impl_sysfs_attrs! {
             $(#[$attr_meta])*
             $vis sysfs_attr $attr_name ($($arg_ident : $arg_ty),*)
             in $sysfs_dir {
@@ -114,13 +114,13 @@ macro_rules! impl_sysfs_attrs {
             $(#[$attr_meta])*
             #[doc = ""]
             $(#[$write_meta])*
-            $vis fn [< set_ $attr_name >] ($($arg_ident: $arg_ty,)* $val_ident: $val_ty) -> $crate::sysfs::Result<()> {
+            $vis fn [< set_ $attr_name >] ($($arg_ident: $arg_ty,)* $val_ident: $val_ty) -> $crate::Result<()> {
                 let file_path = format!("{}/{}", format_args!($sysfs_dir), stringify!($attr_name));
-                $crate::sysfs::sysfs_write(&file_path, $fmt_args)
+                $crate::sysfs_write(&file_path, $fmt_args)
             }
         }
 
-        $crate::sysfs::impl_sysfs_attrs! { $($tail)* }
+        $crate::impl_sysfs_attrs! { $($tail)* }
     };
 }
 

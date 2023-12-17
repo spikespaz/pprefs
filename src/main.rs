@@ -1,7 +1,5 @@
 // <https://github.com/torvalds/linux/blob/master/tools/power/cpupower/utils/helpers/sysfs.c>
 
-pub mod sysfs;
-
 use sysfs::cpufreq;
 
 fn main() {
