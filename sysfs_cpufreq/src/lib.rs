@@ -1,8 +1,7 @@
 //! <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#policy-interface-in-sysfs>
 use std::os::unix::ffi::OsStrExt;
 
-use super::utils::impl_sysfs_attrs;
-use super::Result;
+use sysfs::{impl_sysfs_attrs, Result};
 
 pub static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
 

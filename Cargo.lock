@@ -12,7 +12,7 @@ checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 name = "pprefs"
 version = "0.1.0"
 dependencies = [
- "sysfs",
+ "sysfs_cpufreq",
 ]
 
 [[package]]
@@ -50,6 +50,13 @@ version = "0.1.0"
 dependencies = [
  "paste",
  "thiserror",
+]
+
+[[package]]
+name = "sysfs_cpufreq"
+version = "0.1.0"
+dependencies = [
+ "sysfs",
 ]
 
 [[package]]
