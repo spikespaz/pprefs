@@ -27,6 +27,23 @@ struct AttributeItem {
     getter: Option<GetterSignature>,
 }
 
+struct GetterSignature {
+    span: Span,
+    parse_fn: ExprClosure,
+    into_type: Box<Type>,
+}
+
+struct GetterFunction {
+    span: Span,
+    meta_attrs: Vec<Attribute>,
+    fn_vis: Visibility,
+    attr_name: Ident,
+    attr_path_args: Punctuated<FnArg, Comma>,
+    sysfs_dir: LitStr,
+    parse_fn: ExprClosure,
+    into_type: Box<Type>,
+}
+
 impl Parse for AttributeItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
@@ -60,12 +77,6 @@ impl Parse for AttributeItem {
     }
 }
 
-struct GetterSignature {
-    span: Span,
-    parse_fn: ExprClosure,
-    into_type: Box<Type>,
-}
-
 impl Parse for GetterSignature {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let expr: Expr = input.parse()?;
@@ -87,17 +98,6 @@ impl Parse for GetterSignature {
             _ => Err(Error::new(expr.span(), "expected a function closure")),
         }
     }
-}
-
-struct GetterFunction {
-    span: Span,
-    meta_attrs: Vec<Attribute>,
-    fn_vis: Visibility,
-    attr_name: Ident,
-    attr_path_args: Punctuated<FnArg, Comma>,
-    sysfs_dir: LitStr,
-    parse_fn: ExprClosure,
-    into_type: Box<Type>,
 }
 
 impl TryFrom<AttributeItem> for GetterFunction {
@@ -122,6 +122,15 @@ impl TryFrom<AttributeItem> for GetterFunction {
     }
 }
 
+impl ToTokens for GetterSignature {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let Self { span, parse_fn, .. } = self;
+        tokens.extend(quote_spanned!(*span =>
+            #parse_fn
+        ))
+    }
+}
+
 impl ToTokens for GetterFunction {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let Self {
@@ -143,15 +152,6 @@ impl ToTokens for GetterFunction {
                     $crate::sysfs_read::<#into_type>(&file_path, #parse_fn)
                 }
             }
-        ))
-    }
-}
-
-impl ToTokens for GetterSignature {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let Self { span, parse_fn, .. } = self;
-        tokens.extend(quote_spanned!(*span =>
-            #parse_fn
         ))
     }
 }
