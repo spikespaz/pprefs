@@ -44,6 +44,25 @@ struct GetterFunction {
     into_type: Box<Type>,
 }
 
+struct SetterSignature {
+    span: Span,
+    format_fn: ExprClosure,
+    from_ident: Ident,
+    from_type: Box<Type>,
+}
+
+struct SetterFunction {
+    span: Span,
+    meta_attrs: Vec<Attribute>,
+    fn_vis: Visibility,
+    attr_name: Ident,
+    attr_path_args: Punctuated<FnArg, Comma>,
+    sysfs_dir: LitStr,
+    format_fn: ExprClosure,
+    from_ident: Ident,
+    from_type: Box<Type>,
+}
+
 impl Parse for AttributeItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
