@@ -146,14 +146,14 @@ impl fmt::Debug for GetterFunction {
 
 #[cfg(test)]
 mod tests {
-    use quote::quote;
-
     use super::*;
 
     #[rustfmt::skip]
     macro_rules! test_parse {
-        ($parse_ty:ty, $input:expr) => {{
-            let result: syn::Result<$parse_ty> = syn::parse_str(&($input).to_string());
+        ({ $($input:tt)* } => $parse_ty:ty) => {{
+            let result: syn::Result<$parse_ty> = syn::parse_str(&(quote::quote!{
+                $($input)*
+            }).to_string());
             match result {
                 Ok(parsed) => dbg!(parsed),
                 Err(e) => panic!("{}", e.to_string()),
@@ -163,45 +163,34 @@ mod tests {
 
     #[test]
     fn empty_sysfs_attr_parses() {
-        test_parse!(
-            SysfsAttribute,
-            quote! {
-                pub sysfs_attr some_useless_attr(item: usize) in "/fake/sysfs/path/item{item}" {}
-            }
-        );
+        test_parse!({
+            pub sysfs_attr some_useless_attr(item: usize) in "/fake/sysfs/path/item{item}" {}
+        } => SysfsAttribute);
     }
 
     #[test]
     fn readonly_sysfs_attr_parses() {
-        test_parse!(
-            SysfsAttribute,
-            quote! {
-                pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
-                    read: |text| text.parse().unwrap() => f32,
-                }
+        test_parse!({
+            pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
+                read: |text| text.parse().unwrap() => f32,
             }
-        );
-        test_parse!(
-            SysfsAttribute,
-            quote! {
-                pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
-                    read: |text| -> f32 { text.parse().unwrap() },
-                }
+        } => SysfsAttribute);
+        test_parse!({
+            pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
+                read: |text| -> f32 { text.parse().unwrap() },
             }
-        );
+        } => SysfsAttribute);
     }
 
     #[test]
     fn getter_closure_parses() {
         // With custom fat arrow return type syntax.
-        test_parse!(
-            GetterFunction,
-            quote!(|text| text.parse().unwrap() => isize)
-        );
+        test_parse!({
+            |text| text.parse().unwrap() => isize
+        } => GetterFunction);
         // With native Rust return type syntax.
-        test_parse!(
-            GetterFunction,
-            quote!(|text| -> isize { text.parse().unwrap() })
-        );
+        test_parse!({
+            |text| -> isize { text.parse().unwrap() }
+        } => GetterFunction);
     }
 }
