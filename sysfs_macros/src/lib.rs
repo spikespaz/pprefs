@@ -4,7 +4,7 @@ use std::fmt;
 
 use proc_macro2::Span;
 use quote::quote;
-use syn::parse::{self, Parse, ParseStream};
+use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Colon, Comma, FatArrow, In};
@@ -31,40 +31,33 @@ struct SysfsAttribute {
 
 impl Parse for SysfsAttribute {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let meta_attrs = Attribute::parse_outer(input)?;
-        let fn_vis = Visibility::parse(input)?;
-        kw::sysfs_attr::parse(input)?;
-        let attr_name = Ident::parse(input)?;
-        let args;
-        parenthesized!(args in input);
-        let attr_path_args = args.parse_terminated(FnArg::parse, Comma)?;
-        In::parse(input)?;
-        let sysfs_dir = Lit::parse(input).and_then(|lit| match lit {
-            Lit::Str(sysfs_path) => Ok(sysfs_path),
-            _ => Err(Error::new(lit.span(), "expected a string literal")),
-        })?;
-
-        let braced;
-        braced!(braced in input);
-
-        let getter = if braced.peek(kw::read) {
-            kw::read::parse(&braced)?;
-            Colon::parse(&braced)?;
-            let getter = braced.parse()?;
-            Comma::parse(&braced)?;
-            Some(getter)
-        } else {
-            None
-        };
-
         Ok(Self {
             span: input.span(),
-            meta_attrs,
-            fn_vis,
-            attr_name,
-            attr_path_args,
-            sysfs_dir,
-            getter,
+            meta_attrs: Attribute::parse_outer(input)?,
+            fn_vis: Visibility::parse(input)?,
+            attr_name: kw::sysfs_attr::parse(input).and_then(|_| Ident::parse(input))?,
+            attr_path_args: {
+                let args;
+                parenthesized!(args in input);
+                args.parse_terminated(FnArg::parse, Comma)?
+            },
+            sysfs_dir: In::parse(input).and_then(|_| match Lit::parse(input) {
+                Ok(Lit::Str(sysfs_path)) => Ok(sysfs_path),
+                _ => Err(Error::new(input.span(), "expected a string literal")),
+            })?,
+            getter: {
+                let braced;
+                braced!(braced in input);
+                if braced.peek(kw::read) {
+                    kw::read::parse(&braced)?;
+                    Colon::parse(&braced)?;
+                    let getter = braced.parse()?;
+                    Comma::parse(&braced)?;
+                    Some(getter)
+                } else {
+                    None
+                }
+            },
         })
     }
 }
@@ -104,27 +97,18 @@ impl Parse for GetterFunction {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let expr: Expr = input.parse()?;
         match &expr {
-            Expr::Closure(
-                parse_fn @ ExprClosure {
-                    output: ReturnType::Type(_, ty),
-                    ..
-                },
-            ) => Ok(Self {
-                span: parse_fn.span(),
-                parse_fn: parse_fn.clone(),
-                into_type: ty.clone(),
-            }),
-            Expr::Closure(
-                parse_fn @ ExprClosure {
-                    output: ReturnType::Default,
-                    ..
-                },
-            ) => {
-                FatArrow::parse(input)?;
+            Expr::Closure(parse_fn) => {
+                let output = match &parse_fn.output {
+                    ReturnType::Type(_, ty) => ty.clone(),
+                    ReturnType::Default => {
+                        FatArrow::parse(input)?;
+                        Box::new(Type::parse(input)?)
+                    }
+                };
                 Ok(Self {
                     span: parse_fn.span(),
                     parse_fn: parse_fn.clone(),
-                    into_type: Box::new(Type::parse(input)?),
+                    into_type: output,
                 })
             }
             _ => Err(Error::new(expr.span(), "expected a function closure")),
