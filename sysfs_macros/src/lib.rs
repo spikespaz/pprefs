@@ -1,15 +1,12 @@
 #![allow(dead_code)]
 
-use proc_macro::TokenStream;
-use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::token::{Colon, Comma, In};
+use syn::token::{Colon, Comma, FatArrow, In};
 use syn::{
-    braced, parenthesized, parse_macro_input, Attribute, Block, Error, Expr, ExprClosure, Field,
-    Fields, FieldsNamed, FnArg, Ident, Lit, LitStr, Pat, PatIdent, PatType, ReturnType, Type,
-    Visibility,
+    braced, parenthesized, Attribute, Error, Expr, ExprClosure, FnArg, Ident, Lit, LitStr,
+    ReturnType, Type, Visibility,
 };
 
 mod kw {
@@ -70,19 +67,36 @@ impl Parse for SysfsAttribute {
 
 struct GetterFunction {
     parse_fn: ExprClosure,
-    into_type: ReturnType,
+    into_type: Box<Type>,
 }
 
 impl Parse for GetterFunction {
-    #[rustfmt::skip]
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Expr::parse(input).and_then(|expr| match &expr {
-            Expr::Closure(closure) => Ok(Self {
-                parse_fn: closure.clone(),
-                into_type: closure.output.clone(),
+        let expr: Expr = input.parse()?;
+        match &expr {
+            Expr::Closure(
+                parse_fn @ ExprClosure {
+                    output: ReturnType::Type(_, ty),
+                    ..
+                },
+            ) => Ok(Self {
+                parse_fn: parse_fn.clone(),
+                into_type: ty.clone(),
             }),
+            Expr::Closure(
+                parse_fn @ ExprClosure {
+                    output: ReturnType::Default,
+                    ..
+                },
+            ) => {
+                FatArrow::parse(input)?;
+                Ok(Self {
+                    parse_fn: parse_fn.clone(),
+                    into_type: Box::new(Type::parse(input)?),
+                })
+            }
             _ => Err(Error::new(expr.span(), "expected a function closure")),
-        })
+        }
     }
 }
 
@@ -117,8 +131,8 @@ mod tests {
         test_parse!(
             GetterFunction,
             quote! {
-                |text| text.parse().unwrap()
+                |text| text.parse().unwrap() => usize
             }
-        )
+        );
     }
 }
