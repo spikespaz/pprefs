@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+use std::fmt;
+
+use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -65,6 +68,30 @@ impl Parse for SysfsAttribute {
     }
 }
 
+impl fmt::Debug for SysfsAttribute {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            meta_attrs,
+            fn_vis,
+            attr_name,
+            attr_path_args,
+            sysfs_dir,
+            getter,
+        } = self;
+        let attr_path_args = attr_path_args.into_iter();
+        write!(
+            f,
+            "{}",
+            quote! {
+                #(#meta_attrs)*
+                #fn_vis sysfs_attr #attr_name(#(#attr_path_args)*) in #sysfs_dir {
+
+                }
+            }
+        )
+    }
+}
+
 struct GetterFunction {
     parse_fn: ExprClosure,
     into_type: Box<Type>,
@@ -100,6 +127,23 @@ impl Parse for GetterFunction {
     }
 }
 
+impl fmt::Debug for GetterFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            parse_fn,
+            into_type,
+        } = self;
+        write!(
+            f,
+            "{}",
+            quote!(GetterFunction {
+                parse_fn: #parse_fn,
+                into_type: #into_type,
+            })
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use quote::quote;
@@ -110,8 +154,9 @@ mod tests {
     macro_rules! test_parse {
         ($parse_ty:ty, $input:expr) => {{
             let result: syn::Result<$parse_ty> = syn::parse_str(&($input).to_string());
-            if let Err(e) = result {
-                panic!("{}", e.to_string());
+            match result {
+                Ok(parsed) => dbg!(parsed),
+                Err(e) => panic!("{}", e.to_string()),
             }
         }};
     }
