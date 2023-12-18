@@ -185,6 +185,29 @@ impl TryFrom<AttributeItem> for GetterFunction {
     }
 }
 
+impl TryFrom<AttributeItem> for SetterFunction {
+    type Error = &'static str;
+
+    fn try_from(sysfs_attr: AttributeItem) -> Result<Self, Self::Error> {
+        sysfs_attr
+            .setter
+            .ok_or("provided SysfsAttribute has no setter")
+            .map(|setter| {
+                Ok(Self {
+                    span: sysfs_attr.span,
+                    meta_attrs: sysfs_attr.meta_attrs,
+                    fn_vis: sysfs_attr.fn_vis,
+                    attr_name: sysfs_attr.attr_name,
+                    attr_path_args: sysfs_attr.attr_path_args,
+                    sysfs_dir: sysfs_attr.sysfs_dir,
+                    format_fn: setter.format_fn,
+                    from_ident: setter.from_ident,
+                    from_type: setter.from_type,
+                })
+            })?
+    }
+}
+
 impl ToTokens for GetterFunction {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let Self {
