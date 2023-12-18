@@ -48,14 +48,12 @@ impl Parse for SysfsAttribute {
         let getter = if braced.peek(kw::read) {
             kw::read::parse(&braced)?;
             Colon::parse(&braced)?;
-            Some(braced.parse()?)
+            let getter = braced.parse()?;
+            Comma::parse(&braced)?;
+            Some(getter)
         } else {
             None
         };
-
-        if getter.is_some() {
-            Comma::parse(&braced)?;
-        }
 
         Ok(Self {
             meta_attrs,
