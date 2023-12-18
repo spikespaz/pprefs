@@ -172,6 +172,26 @@ mod tests {
     }
 
     #[test]
+    fn readonly_sysfs_attr_parses() {
+        test_parse!(
+            SysfsAttribute,
+            quote! {
+                pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
+                    read: |text| text.parse().unwrap() => f32,
+                }
+            }
+        );
+        test_parse!(
+            SysfsAttribute,
+            quote! {
+                pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
+                    read: |text| -> f32 { text.parse().unwrap() },
+                }
+            }
+        );
+    }
+
+    #[test]
     fn getter_closure_parses() {
         // With custom fat arrow return type syntax.
         test_parse!(
