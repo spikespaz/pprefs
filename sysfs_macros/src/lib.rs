@@ -122,15 +122,6 @@ impl TryFrom<AttributeItem> for GetterFunction {
     }
 }
 
-impl ToTokens for GetterSignature {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let Self { span, parse_fn, .. } = self;
-        tokens.extend(quote_spanned!(*span =>
-            #parse_fn
-        ))
-    }
-}
-
 impl ToTokens for GetterFunction {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let Self {
@@ -179,8 +170,8 @@ mod tests {
     macro_rules! test_roundtrip {
         ({ $($input:tt)* } => $parse_ty:ty) => {{
             let mut tokens = proc_macro2::TokenStream::new();
-            let getter: $parse_ty = parse_quote!($($input)*);
-            getter.to_tokens(&mut tokens);
+            let parsed: $parse_ty = parse_quote!($($input)*);
+            parsed.to_tokens(&mut tokens);
             eprintln!("parsed {}: {}", stringify!($parse_ty), tokens)
         }};
     }
@@ -214,18 +205,6 @@ mod tests {
         } => GetterSignature);
         // With native Rust return type syntax.
         test_parse!({
-            |text| -> isize { text.parse().unwrap() }
-        } => GetterSignature);
-    }
-
-    #[test]
-    fn getter_roundtrip() {
-        // With custom fat arrow return type syntax.
-        test_roundtrip!({
-            |text| text.parse().unwrap() => isize
-        } => GetterSignature);
-        // With native Rust return type syntax.
-        test_roundtrip!({
             |text| -> isize { text.parse().unwrap() }
         } => GetterSignature);
     }
