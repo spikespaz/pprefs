@@ -121,10 +121,10 @@ impl_sysfs_attrs! {
         read: |text| text.parse().unwrap() => usize,
     }
 
-    // /// The scaling driver currently in use.
-    // pub sysfs_attr scaling_driver(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
-    //     read: ToOwned::to_owned => String,
-    // }
+    /// The scaling driver currently in use.
+    pub sysfs_attr scaling_driver(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+        read: ToOwned::to_owned => String,
+    }
 
     /// The scaling governor currently attached to this policy or (if the
     /// intel_pstate scaling driver is in use) the scaling algorithm
@@ -138,7 +138,7 @@ impl_sysfs_attrs! {
     /// scaling_available_governors attribute described above).
     pub sysfs_attr scaling_governor(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
         read: ToOwned::to_owned => String,
-        write: |gov: &str| format!("{gov}"),
+        write: |gov: &str| gov.to_string(),
     }
 
     /// Maximum frequency the CPUs belonging to this policy are allowed to

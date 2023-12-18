@@ -9,7 +9,7 @@ use syn::spanned::Spanned;
 use syn::token::{Colon, Comma, FatArrow, In};
 use syn::{
     braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, FnArg, Ident,
-    Lit, LitStr, Pat, PatIdent, PatType, ReturnType, Type, Visibility,
+    Lit, LitStr, Pat, PatIdent, PatType, Type, Visibility,
 };
 
 mod kw {
@@ -35,7 +35,7 @@ struct AttributeItems(Vec<AttributeItem>);
 #[derive(Clone)]
 struct GetterSignature {
     span: Span,
-    parse_fn: ExprClosure,
+    parse_fn: Expr,
     into_type: Box<Type>,
 }
 
@@ -46,7 +46,7 @@ struct GetterFunction {
     attr_name: Ident,
     attr_path_args: Punctuated<FnArg, Comma>,
     sysfs_dir: LitStr,
-    parse_fn: ExprClosure,
+    parse_fn: Expr,
     into_type: Box<Type>,
 }
 
@@ -124,23 +124,15 @@ impl Parse for AttributeItems {
 impl Parse for GetterSignature {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let expr: Expr = input.parse()?;
-        match &expr {
-            Expr::Closure(parse_fn) => {
-                let output = match &parse_fn.output {
-                    ReturnType::Type(_, ty) => ty.clone(),
-                    ReturnType::Default => {
-                        FatArrow::parse(input)?;
-                        Box::new(Type::parse(input)?)
-                    }
-                };
-                Ok(Self {
-                    span: parse_fn.span(),
-                    parse_fn: parse_fn.clone(),
-                    into_type: output,
-                })
-            }
-            _ => Err(Error::new(expr.span(), "expected a function closure")),
-        }
+
+        Ok(Self {
+            span: expr.span(),
+            parse_fn: expr,
+            into_type: {
+                FatArrow::parse(input)?;
+                Box::new(Type::parse(input)?)
+            },
+        })
     }
 }
 
@@ -335,11 +327,6 @@ mod tests {
                 read: |text| text.parse().unwrap() => f32,
             }
         } => AttributeItem);
-        test_parse!({
-            pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
-                read: |text| -> f32 { text.parse().unwrap() },
-            }
-        } => AttributeItem);
     }
 
     #[test]
@@ -354,13 +341,8 @@ mod tests {
 
     #[test]
     fn getter_closure_parses() {
-        // With custom fat arrow return type syntax.
         test_parse!({
             |text| text.parse().unwrap() => isize
-        } => GetterSignature);
-        // With native Rust return type syntax.
-        test_parse!({
-            |text| -> isize { text.parse().unwrap() }
         } => GetterSignature);
     }
 
