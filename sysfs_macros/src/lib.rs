@@ -7,8 +7,8 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Colon, Comma, FatArrow, In};
 use syn::{
-    braced, parenthesized, Attribute, Error, Expr, ExprClosure, FnArg, Ident, Lit, LitStr,
-    ReturnType, Type, Visibility,
+    braced, parenthesized, Attribute, Error, Expr, ExprClosure, FnArg, Ident, Lit, LitStr, Pat,
+    PatIdent, PatType, ReturnType, Type, Visibility,
 };
 
 mod kw {
@@ -112,6 +112,41 @@ impl Parse for GetterSignature {
                     span: parse_fn.span(),
                     parse_fn: parse_fn.clone(),
                     into_type: output,
+                })
+            }
+            _ => Err(Error::new(expr.span(), "expected a function closure")),
+        }
+    }
+}
+
+impl Parse for SetterSignature {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let expr: Expr = input.parse()?;
+        match &expr {
+            Expr::Closure(parse_fn) => {
+                let first_input = parse_fn.inputs.first().ok_or_else(|| {
+                    Error::new(parse_fn.span(), "expected at least one argument in closure")
+                })?;
+
+                let (from_ident, from_type) =
+                    if let Pat::Type(PatType { pat, ty, .. }) = first_input {
+                        if let Pat::Ident(PatIdent { ident, .. }) = pat.as_ref() {
+                            Ok((ident, ty))
+                        } else {
+                            Err(Error::new(pat.span(), "expected a single typed identifier"))
+                        }
+                    } else {
+                        Err(Error::new(
+                            first_input.span(),
+                            "expected a single typed identifier",
+                        ))
+                    }?;
+
+                Ok(Self {
+                    span: parse_fn.span(),
+                    format_fn: parse_fn.clone(),
+                    from_ident: from_ident.clone(),
+                    from_type: from_type.clone(),
                 })
             }
             _ => Err(Error::new(expr.span(), "expected a function closure")),
@@ -226,6 +261,13 @@ mod tests {
         test_parse!({
             |text| -> isize { text.parse().unwrap() }
         } => GetterSignature);
+    }
+
+    #[test]
+    fn setter_closure_parses() {
+        test_parse!({
+            |frequency: usize| format_args!(frequency)
+        } => SetterSignature);
     }
 
     #[test]
