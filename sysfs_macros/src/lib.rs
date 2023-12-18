@@ -2,8 +2,9 @@
 
 use std::fmt;
 
+use proc_macro2::Span;
 use quote::quote;
-use syn::parse::{Parse, ParseStream};
+use syn::parse::{self, Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Colon, Comma, FatArrow, In};
@@ -19,6 +20,7 @@ mod kw {
 }
 
 struct SysfsAttribute {
+    span: Span,
     meta_attrs: Vec<Attribute>,
     fn_vis: Visibility,
     attr_name: Ident,
@@ -56,6 +58,7 @@ impl Parse for SysfsAttribute {
         };
 
         Ok(Self {
+            span: input.span(),
             meta_attrs,
             fn_vis,
             attr_name,
@@ -75,6 +78,7 @@ impl fmt::Debug for SysfsAttribute {
             attr_path_args,
             sysfs_dir,
             getter,
+            ..
         } = self;
         let attr_path_args = attr_path_args.into_iter();
         write!(
@@ -91,6 +95,7 @@ impl fmt::Debug for SysfsAttribute {
 }
 
 struct GetterFunction {
+    span: Span,
     parse_fn: ExprClosure,
     into_type: Box<Type>,
 }
@@ -105,6 +110,7 @@ impl Parse for GetterFunction {
                     ..
                 },
             ) => Ok(Self {
+                span: parse_fn.span(),
                 parse_fn: parse_fn.clone(),
                 into_type: ty.clone(),
             }),
@@ -116,6 +122,7 @@ impl Parse for GetterFunction {
             ) => {
                 FatArrow::parse(input)?;
                 Ok(Self {
+                    span: parse_fn.span(),
                     parse_fn: parse_fn.clone(),
                     into_type: Box::new(Type::parse(input)?),
                 })
@@ -130,6 +137,7 @@ impl fmt::Debug for GetterFunction {
         let Self {
             parse_fn,
             into_type,
+            ..
         } = self;
         write!(
             f,
