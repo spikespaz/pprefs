@@ -116,6 +116,15 @@ impl Parse for GetterFunction {
     }
 }
 
+impl ToTokens for GetterFunction {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let Self { span, parse_fn, .. } = self;
+        tokens.extend(quote_spanned!(*span =>
+            #parse_fn
+        ))
+    }
+}
+
 impl fmt::Debug for GetterFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
