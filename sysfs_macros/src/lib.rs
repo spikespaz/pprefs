@@ -3,7 +3,7 @@
 use std::fmt;
 
 use proc_macro2::Span;
-use quote::quote;
+use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -145,6 +145,8 @@ impl fmt::Debug for GetterFunction {
 
 #[cfg(test)]
 mod tests {
+    use syn::parse_quote;
+
     use super::*;
 
     #[rustfmt::skip]
@@ -157,6 +159,16 @@ mod tests {
                 Ok(parsed) => dbg!(parsed),
                 Err(e) => panic!("{}", e.to_string()),
             }
+        }};
+    }
+
+    #[rustfmt::skip]
+    macro_rules! test_roundtrip {
+        ({ $($input:tt)* } => $parse_ty:ty) => {{
+            let mut tokens = proc_macro2::TokenStream::new();
+            let getter: $parse_ty = parse_quote!($($input)*);
+            getter.to_tokens(&mut tokens);
+            eprintln!("parsed {}: {}", stringify!($parse_ty), tokens)
         }};
     }
 
@@ -189,6 +201,18 @@ mod tests {
         } => GetterFunction);
         // With native Rust return type syntax.
         test_parse!({
+            |text| -> isize { text.parse().unwrap() }
+        } => GetterFunction);
+    }
+
+    #[test]
+    fn getter_roundtrip() {
+        // With custom fat arrow return type syntax.
+        test_roundtrip!({
+            |text| text.parse().unwrap() => isize
+        } => GetterFunction);
+        // With native Rust return type syntax.
+        test_roundtrip!({
             |text| -> isize { text.parse().unwrap() }
         } => GetterFunction);
     }
