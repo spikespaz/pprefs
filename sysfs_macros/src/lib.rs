@@ -116,6 +116,64 @@ impl Parse for GetterSignature {
     }
 }
 
+struct GetterFunction {
+    span: Span,
+    meta_attrs: Vec<Attribute>,
+    fn_vis: Visibility,
+    attr_name: Ident,
+    attr_path_args: Punctuated<FnArg, Comma>,
+    sysfs_dir: LitStr,
+    parse_fn: ExprClosure,
+    into_type: Box<Type>,
+}
+
+impl TryFrom<AttributeItem> for GetterFunction {
+    type Error = &'static str;
+
+    fn try_from(sysfs_attr: AttributeItem) -> Result<Self, Self::Error> {
+        sysfs_attr
+            .getter
+            .ok_or("provided SysfsAttribute has no getter")
+            .map(|getter| {
+                Ok(Self {
+                    span: sysfs_attr.span,
+                    meta_attrs: sysfs_attr.meta_attrs,
+                    fn_vis: sysfs_attr.fn_vis,
+                    attr_name: sysfs_attr.attr_name,
+                    attr_path_args: sysfs_attr.attr_path_args,
+                    sysfs_dir: sysfs_attr.sysfs_dir,
+                    parse_fn: getter.parse_fn,
+                    into_type: getter.into_type,
+                })
+            })?
+    }
+}
+
+impl ToTokens for GetterFunction {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let Self {
+            span,
+            meta_attrs,
+            fn_vis,
+            attr_name,
+            attr_path_args,
+            sysfs_dir,
+            parse_fn,
+            into_type,
+        } = self;
+        let attr_path_args = attr_path_args.iter();
+        tokens.extend(quote_spanned!(*span =>
+            #(#meta_attrs)*
+            #fn_vis #attr_name(#(#attr_path_args)*) -> sysfs::Result<#into_type> {
+                let file_path = format!("{}/{}", format_args!(#sysfs_dir), stringify!(#attr_name));
+                unsafe {
+                    $crate::sysfs_read::<#into_type>(&file_path, #parse_fn)
+                }
+            }
+        ))
+    }
+}
+
 impl ToTokens for GetterSignature {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let Self { span, parse_fn, .. } = self;
@@ -215,5 +273,19 @@ mod tests {
         test_roundtrip!({
             |text| -> isize { text.parse().unwrap() }
         } => GetterSignature);
+    }
+
+    #[test]
+    fn readonly_sysfs_attr_roundtrips() {
+        let mut tokens = proc_macro2::TokenStream::new();
+        let sysfs_attr: AttributeItem = parse_quote! {
+            pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
+                read: |text| text.parse().unwrap() => f32,
+            }
+        };
+        let getter =
+            GetterFunction::try_from(sysfs_attr).unwrap_or_else(|error| panic!("{}", error));
+        getter.to_tokens(&mut tokens);
+        eprintln!("parsed {}: {}", stringify!(GetterFunction), tokens)
     }
 }
