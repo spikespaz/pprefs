@@ -25,6 +25,7 @@ struct AttributeItem {
     attr_path_args: Punctuated<FnArg, Comma>,
     sysfs_dir: LitStr,
     getter: Option<GetterSignature>,
+    setter: Option<SetterSignature>,
 }
 
 struct GetterSignature {
@@ -65,7 +66,7 @@ struct SetterFunction {
 
 impl Parse for AttributeItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
+        let mut sysfs_attr = Self {
             span: input.span(),
             meta_attrs: Attribute::parse_outer(input)?,
             fn_vis: Visibility::parse(input)?,
@@ -79,20 +80,28 @@ impl Parse for AttributeItem {
                 Ok(Lit::Str(sysfs_path)) => Ok(sysfs_path),
                 _ => Err(Error::new(input.span(), "expected a string literal")),
             })?,
-            getter: {
-                let braced;
-                braced!(braced in input);
-                if braced.peek(kw::read) {
-                    kw::read::parse(&braced)?;
-                    Colon::parse(&braced)?;
-                    let getter = braced.parse()?;
-                    Comma::parse(&braced)?;
-                    Some(getter)
-                } else {
-                    None
-                }
-            },
-        })
+            getter: None,
+            setter: None,
+        };
+
+        let braced;
+        braced!(braced in input);
+
+        if braced.peek(kw::read) {
+            kw::read::parse(&braced)?;
+            Colon::parse(&braced)?;
+            sysfs_attr.getter = Some(braced.parse()?);
+            Comma::parse(&braced)?;
+        }
+
+        if braced.peek(kw::write) {
+            kw::write::parse(&braced)?;
+            Colon::parse(&braced)?;
+            sysfs_attr.setter = Some(braced.parse()?);
+            Comma::parse(&braced)?;
+        }
+
+        Ok(sysfs_attr)
     }
 }
 
@@ -226,7 +235,7 @@ mod tests {
             let mut tokens = proc_macro2::TokenStream::new();
             let parsed: $parse_ty = parse_quote!($($input)*);
             parsed.to_tokens(&mut tokens);
-            eprintln!("parsed {}: {}", stringify!($parse_ty), tokens)
+            println!("parsed {}: {}", stringify!($parse_ty), tokens)
         }};
     }
 
@@ -247,6 +256,16 @@ mod tests {
         test_parse!({
             pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| -> f32 { text.parse().unwrap() },
+            }
+        } => AttributeItem);
+    }
+
+    #[test]
+    fn readwrite_sysfs_attr_parses() {
+        test_parse!({
+            pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/boolean{item}" {
+                read: |text| text.parse().unwrap() => bool,
+                write: |value: bool| format_args!("{}", value as u8),
             }
         } => AttributeItem);
     }
