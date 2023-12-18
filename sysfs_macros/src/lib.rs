@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use proc_macro2::Span;
-use quote::{quote_spanned, ToTokens};
+use quote::{format_ident, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -230,6 +230,31 @@ impl ToTokens for GetterFunction {
                 }
             }
         ))
+    }
+}
+
+impl ToTokens for SetterFunction {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let Self {
+            span,
+            meta_attrs,
+            fn_vis,
+            attr_name,
+            attr_path_args,
+            sysfs_dir,
+            format_fn,
+            from_ident,
+            from_type,
+        } = self;
+        let attr_path_args = attr_path_args.iter();
+        let setter_ident = format_ident!("set_{}", attr_name);
+        tokens.extend(quote_spanned!(*span =>
+            #(#meta_attrs)*
+            #fn_vis #setter_ident(#(#attr_path_args)* #from_ident: #from_type) -> sysfs::Result<()> {
+                let file_path = format!("{}/{}", format_args!(#sysfs_dir), stringify!(#attr_name));
+                sysfs::sysfs_write(&file_path, #format_fn)
+            }
+        ));
     }
 }
 
