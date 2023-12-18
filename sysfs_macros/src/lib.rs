@@ -173,11 +173,15 @@ mod tests {
 
     #[test]
     fn getter_closure_parses() {
+        // With custom fat arrow return type syntax.
         test_parse!(
             GetterFunction,
-            quote! {
-                |text| text.parse().unwrap() => usize
-            }
+            quote!(|text| text.parse().unwrap() => isize)
+        );
+        // With native Rust return type syntax.
+        test_parse!(
+            GetterFunction,
+            quote!(|text| -> isize { text.parse().unwrap() })
         );
     }
 }
