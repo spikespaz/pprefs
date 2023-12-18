@@ -57,6 +57,7 @@ name = "sysfs_cpufreq"
 version = "0.1.0"
 dependencies = [
  "sysfs",
+ "sysfs_macros",
 ]
 
 [[package]]

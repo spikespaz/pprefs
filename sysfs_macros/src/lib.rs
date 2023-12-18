@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{format_ident, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream};
@@ -7,8 +8,8 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Colon, Comma, FatArrow, In};
 use syn::{
-    braced, parenthesized, Attribute, Error, Expr, ExprClosure, FnArg, Ident, Lit, LitStr, Pat,
-    PatIdent, PatType, ReturnType, Type, Visibility,
+    braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, FnArg, Ident,
+    Lit, LitStr, Pat, PatIdent, PatType, ReturnType, Type, Visibility,
 };
 
 mod kw {
@@ -17,6 +18,7 @@ mod kw {
     syn::custom_keyword!(write);
 }
 
+#[derive(Clone)]
 struct AttributeItem {
     span: Span,
     meta_attrs: Vec<Attribute>,
@@ -28,6 +30,9 @@ struct AttributeItem {
     setter: Option<SetterSignature>,
 }
 
+struct AttributeItems(Vec<AttributeItem>);
+
+#[derive(Clone)]
 struct GetterSignature {
     span: Span,
     parse_fn: ExprClosure,
@@ -45,6 +50,7 @@ struct GetterFunction {
     into_type: Box<Type>,
 }
 
+#[derive(Clone)]
 struct SetterSignature {
     span: Span,
     format_fn: ExprClosure,
@@ -102,6 +108,16 @@ impl Parse for AttributeItem {
         }
 
         Ok(sysfs_attr)
+    }
+}
+
+impl Parse for AttributeItems {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut items = Vec::new();
+        while !input.is_empty() {
+            items.push(input.parse()?);
+        }
+        Ok(Self(items))
     }
 }
 
@@ -250,12 +266,30 @@ impl ToTokens for SetterFunction {
         let setter_ident = format_ident!("set_{}", attr_name);
         tokens.extend(quote_spanned!(*span =>
             #(#meta_attrs)*
+            #[allow(clippy::redundant_closure_call)]
             #fn_vis fn #setter_ident(#(#attr_path_args,)* #from_ident: #from_type) -> sysfs::Result<()> {
                 let file_path = format!("{}/{}", format_args!(#sysfs_dir), stringify!(#attr_name));
-                sysfs::sysfs_write(&file_path, #format_fn)
+                sysfs::sysfs_write(&file_path, (#format_fn)(#from_ident))
             }
         ));
     }
+}
+
+#[proc_macro]
+pub fn impl_sysfs_attrs(tokens: TokenStream) -> TokenStream {
+    let AttributeItems(items) = parse_macro_input!(tokens as AttributeItems);
+    let mut tokens = proc_macro2::TokenStream::new();
+
+    for sysfs_attr in items {
+        if let Ok(getter) = GetterFunction::try_from(sysfs_attr.clone()) {
+            tokens.extend(quote_spanned!(getter.span => #getter));
+        }
+        if let Ok(setter) = SetterFunction::try_from(sysfs_attr.clone()) {
+            tokens.extend(quote_spanned!(setter.span => #setter));
+        }
+    }
+
+    tokens.into()
 }
 
 #[cfg(test)]

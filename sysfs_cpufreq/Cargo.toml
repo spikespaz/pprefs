@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 sysfs = { path = "../sysfs" }
+sysfs_macros = { path = "../sysfs_macros" }
