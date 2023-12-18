@@ -19,17 +19,17 @@ mod kw {
     syn::custom_keyword!(write);
 }
 
-struct SysfsAttribute {
+struct AttributeItem {
     span: Span,
     meta_attrs: Vec<Attribute>,
     fn_vis: Visibility,
     attr_name: Ident,
     attr_path_args: Punctuated<FnArg, Comma>,
     sysfs_dir: LitStr,
-    getter: Option<GetterFunction>,
+    getter: Option<GetterSignature>,
 }
 
-impl Parse for SysfsAttribute {
+impl Parse for AttributeItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         Ok(Self {
             span: input.span(),
@@ -62,7 +62,7 @@ impl Parse for SysfsAttribute {
     }
 }
 
-impl fmt::Debug for SysfsAttribute {
+impl fmt::Debug for AttributeItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             meta_attrs,
@@ -87,13 +87,13 @@ impl fmt::Debug for SysfsAttribute {
     }
 }
 
-struct GetterFunction {
+struct GetterSignature {
     span: Span,
     parse_fn: ExprClosure,
     into_type: Box<Type>,
 }
 
-impl Parse for GetterFunction {
+impl Parse for GetterSignature {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let expr: Expr = input.parse()?;
         match &expr {
@@ -116,7 +116,7 @@ impl Parse for GetterFunction {
     }
 }
 
-impl ToTokens for GetterFunction {
+impl ToTokens for GetterSignature {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let Self { span, parse_fn, .. } = self;
         tokens.extend(quote_spanned!(*span =>
@@ -125,7 +125,7 @@ impl ToTokens for GetterFunction {
     }
 }
 
-impl fmt::Debug for GetterFunction {
+impl fmt::Debug for GetterSignature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             parse_fn,
@@ -176,7 +176,7 @@ mod tests {
     fn empty_sysfs_attr_parses() {
         test_parse!({
             pub sysfs_attr some_useless_attr(item: usize) in "/fake/sysfs/path/item{item}" {}
-        } => SysfsAttribute);
+        } => AttributeItem);
     }
 
     #[test]
@@ -185,12 +185,12 @@ mod tests {
             pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| text.parse().unwrap() => f32,
             }
-        } => SysfsAttribute);
+        } => AttributeItem);
         test_parse!({
             pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| -> f32 { text.parse().unwrap() },
             }
-        } => SysfsAttribute);
+        } => AttributeItem);
     }
 
     #[test]
@@ -198,11 +198,11 @@ mod tests {
         // With custom fat arrow return type syntax.
         test_parse!({
             |text| text.parse().unwrap() => isize
-        } => GetterFunction);
+        } => GetterSignature);
         // With native Rust return type syntax.
         test_parse!({
             |text| -> isize { text.parse().unwrap() }
-        } => GetterFunction);
+        } => GetterSignature);
     }
 
     #[test]
@@ -210,10 +210,10 @@ mod tests {
         // With custom fat arrow return type syntax.
         test_roundtrip!({
             |text| text.parse().unwrap() => isize
-        } => GetterFunction);
+        } => GetterSignature);
         // With native Rust return type syntax.
         test_roundtrip!({
             |text| -> isize { text.parse().unwrap() }
-        } => GetterFunction);
+        } => GetterSignature);
     }
 }
