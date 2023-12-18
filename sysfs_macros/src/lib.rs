@@ -266,7 +266,13 @@ mod tests {
     #[test]
     fn setter_closure_parses() {
         test_parse!({
-            |frequency: usize| format_args!(frequency)
+            |frequency: usize| format_args!("{}", frequency)
+        } => SetterSignature);
+        test_parse!({
+            |number: i32| format_args!("{number}")
+        } => SetterSignature);
+        test_parse!({
+            |flag: bool| format_args!("{}", bool as u8)
         } => SetterSignature);
     }
 
