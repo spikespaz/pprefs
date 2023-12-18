@@ -223,10 +223,10 @@ impl ToTokens for GetterFunction {
         let attr_path_args = attr_path_args.iter();
         tokens.extend(quote_spanned!(*span =>
             #(#meta_attrs)*
-            #fn_vis #attr_name(#(#attr_path_args)*) -> sysfs::Result<#into_type> {
+            #fn_vis fn #attr_name(#(#attr_path_args,)*) -> sysfs::Result<#into_type> {
                 let file_path = format!("{}/{}", format_args!(#sysfs_dir), stringify!(#attr_name));
                 unsafe {
-                    $crate::sysfs_read::<#into_type>(&file_path, #parse_fn)
+                    sysfs::sysfs_read::<#into_type>(&file_path, #parse_fn)
                 }
             }
         ))
@@ -250,7 +250,7 @@ impl ToTokens for SetterFunction {
         let setter_ident = format_ident!("set_{}", attr_name);
         tokens.extend(quote_spanned!(*span =>
             #(#meta_attrs)*
-            #fn_vis #setter_ident(#(#attr_path_args)* #from_ident: #from_type) -> sysfs::Result<()> {
+            #fn_vis fn #setter_ident(#(#attr_path_args,)* #from_ident: #from_type) -> sysfs::Result<()> {
                 let file_path = format!("{}/{}", format_args!(#sysfs_dir), stringify!(#attr_name));
                 sysfs::sysfs_write(&file_path, #format_fn)
             }
