@@ -4,7 +4,7 @@ use sysfs_macros::impl_sysfs_attrs;
 
 pub static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
 
-pub fn num_policies() -> Result<usize> {
+pub fn num_cpus() -> Result<usize> {
     std::fs::read_dir(SYSFS_DIR)?.try_fold(0, |acc, res| match (acc, res) {
         (acc, Ok(inode))
             if {

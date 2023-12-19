@@ -3,7 +3,7 @@
 use sysfs_cpufreq as cpufreq;
 
 fn main() {
-    for cpu_num in 0..cpufreq::num_policies().unwrap() {
+    for cpu_num in 0..cpufreq::num_cpus().unwrap() {
         println!(
             r#"{}/policy{}:
     affected_cpus               - {:?}
