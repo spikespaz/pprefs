@@ -1,26 +1,17 @@
 //! <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#policy-interface-in-sysfs>
-use std::os::unix::ffi::OsStrExt;
-
 use sysfs::Result;
 use sysfs_macros::impl_sysfs_attrs;
 
 pub static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
 
 pub fn num_policies() -> Result<usize> {
-    let policy_prefix = "policy".as_bytes();
     std::fs::read_dir(SYSFS_DIR)?.try_fold(0, |acc, res| match (acc, res) {
         (acc, Ok(inode))
             if {
                 let name = inode.file_name();
-                let name = name.as_bytes();
-                // Not sure if this is robust enough.
-                // This will make sure that the name starts with "policy" but does not equal
-                // exactly "policy". It does not, however, check for non-numeric
-                // characters at the end of the "policy" prefix. Realistically,
-                // we need to pattern match here, something like `^policy[0-9]+$`.
-                // Unfortunately regex is heavier than I want it to be, so that's not a good
-                // option.
-                name.len() >= policy_prefix.len() && &name[..policy_prefix.len()] == policy_prefix
+                let name = name.to_string_lossy();
+                name.starts_with("policy")
+                    && name["policy".len()..].chars().all(|ch| ch.is_ascii_digit())
             } =>
         {
             Ok(acc + 1)
