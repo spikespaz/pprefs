@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn readwrite_sysfs_attr_parses() {
         test_parse!({
-            pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/boolean{item}" {
+            pub sysfs_attr some_readwrite_attr(item: usize) in "/fake/sysfs/path/boolean{item}" {
                 read: |text| text.parse().unwrap() => bool,
                 write: |value: bool| format_args!("{}", value as u8),
             }
@@ -367,9 +367,27 @@ mod tests {
                 read: |text| text.parse().unwrap() => f32,
             }
         };
-        let getter =
-            GetterFunction::try_from(sysfs_attr).unwrap_or_else(|error| panic!("{}", error));
-        getter.to_tokens(&mut tokens);
+        GetterFunction::try_from(sysfs_attr)
+            .unwrap_or_else(|error| panic!("{}", error))
+            .to_tokens(&mut tokens);
+        eprintln!("parsed {}: {}", stringify!(GetterFunction), tokens)
+    }
+
+    #[test]
+    fn readwrite_sysfs_attr_roundtrips() {
+        let mut tokens = proc_macro2::TokenStream::new();
+        let sysfs_attr: AttributeItem = parse_quote! {
+            pub sysfs_attr some_write_attr(item: usize) in "/fake/sysfs/path/item{item}" {
+                read: |text| text.parse().unwrap() => f32,
+                write: |value: f32| fornat!("{value}"),
+            }
+        };
+        GetterFunction::try_from(sysfs_attr.clone())
+            .unwrap_or_else(|error| panic!("{}", error))
+            .to_tokens(&mut tokens);
+        SetterFunction::try_from(sysfs_attr.clone())
+            .unwrap_or_else(|error| panic!("{}", error))
+            .to_tokens(&mut tokens);
         eprintln!("parsed {}: {}", stringify!(GetterFunction), tokens)
     }
 }
