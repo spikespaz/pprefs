@@ -1,5 +1,5 @@
 [package]
-name = "sysfs_cpufreq"
+name = "sysfs_cpu"
 version = "0.1.0"
 edition = "2021"
 

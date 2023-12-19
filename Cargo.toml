@@ -1,5 +1,5 @@
 [workspace]
-members = ["sysfs", "sysfs_cpufreq", "sysfs_macros"]
+members = ["sysfs", "sysfs_cpu", "sysfs_macros"]
 
 [package]
 name = "pprefs"
@@ -9,4 +9,4 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sysfs_cpufreq = { path = "./sysfs_cpufreq" }
+sysfs_cpu = { path = "./sysfs_cpu" }
