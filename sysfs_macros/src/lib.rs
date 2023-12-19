@@ -25,7 +25,7 @@ struct AttributeItem {
     fn_vis: Visibility,
     attr_name: Ident,
     attr_path_args: Punctuated<FnArg, Comma>,
-    sysfs_dir: LitStr,
+    sysfs_dir: Option<LitStr>,
     getter: Option<GetterSignature>,
     setter: Option<SetterSignature>,
 }
@@ -82,10 +82,13 @@ impl Parse for AttributeItem {
                 parenthesized!(args in input);
                 args.parse_terminated(FnArg::parse, Comma)?
             },
-            sysfs_dir: In::parse(input).and_then(|_| match Lit::parse(input) {
-                Ok(Lit::Str(sysfs_path)) => Ok(sysfs_path),
-                _ => Err(Error::new(input.span(), "expected a string literal")),
-            })?,
+            sysfs_dir: In::parse(input)
+                .ok()
+                .map(|_| match Lit::parse(input) {
+                    Ok(Lit::Str(sysfs_path)) => Ok(sysfs_path),
+                    _ => Err(Error::new(input.span(), "expected a string literal")),
+                })
+                .transpose()?,
             getter: None,
             setter: None,
         };
@@ -172,47 +175,53 @@ impl Parse for SetterSignature {
 }
 
 impl TryFrom<AttributeItem> for GetterFunction {
-    type Error = &'static str;
+    type Error = Error;
 
     fn try_from(sysfs_attr: AttributeItem) -> Result<Self, Self::Error> {
-        sysfs_attr
-            .getter
-            .ok_or("provided SysfsAttribute has no getter")
-            .map(|getter| {
-                Ok(Self {
-                    span: sysfs_attr.span,
-                    meta_attrs: sysfs_attr.meta_attrs,
-                    fn_vis: sysfs_attr.fn_vis,
-                    attr_name: sysfs_attr.attr_name,
-                    attr_path_args: sysfs_attr.attr_path_args,
-                    sysfs_dir: sysfs_attr.sysfs_dir,
-                    parse_fn: getter.parse_fn,
-                    into_type: getter.into_type,
-                })
-            })?
+        let getter = sysfs_attr.getter.ok_or(Error::new(
+            sysfs_attr.span,
+            "provided `AttributeItem` has no `getter` closure",
+        ))?;
+        let sysfs_dir = sysfs_attr.sysfs_dir.ok_or(Error::new(
+            sysfs_attr.span,
+            "provided `AttributeItem` has no `sysfs_dir` literal",
+        ))?;
+        Ok(Self {
+            span: sysfs_attr.span,
+            meta_attrs: sysfs_attr.meta_attrs,
+            fn_vis: sysfs_attr.fn_vis,
+            attr_name: sysfs_attr.attr_name,
+            attr_path_args: sysfs_attr.attr_path_args,
+            sysfs_dir,
+            parse_fn: getter.parse_fn,
+            into_type: getter.into_type,
+        })
     }
 }
 
 impl TryFrom<AttributeItem> for SetterFunction {
-    type Error = &'static str;
+    type Error = Error;
 
     fn try_from(sysfs_attr: AttributeItem) -> Result<Self, Self::Error> {
-        sysfs_attr
-            .setter
-            .ok_or("provided SysfsAttribute has no setter")
-            .map(|setter| {
-                Ok(Self {
-                    span: sysfs_attr.span,
-                    meta_attrs: sysfs_attr.meta_attrs,
-                    fn_vis: sysfs_attr.fn_vis,
-                    attr_name: sysfs_attr.attr_name,
-                    attr_path_args: sysfs_attr.attr_path_args,
-                    sysfs_dir: sysfs_attr.sysfs_dir,
-                    format_fn: setter.format_fn,
-                    from_ident: setter.from_ident,
-                    from_type: setter.from_type,
-                })
-            })?
+        let setter = sysfs_attr.setter.ok_or(Error::new(
+            sysfs_attr.span,
+            "provided `AttributeItem` has no `setter` closure",
+        ))?;
+        let sysfs_dir = sysfs_attr.sysfs_dir.ok_or(Error::new(
+            sysfs_attr.span,
+            "provided `AttributeItem` has no `sysfs_dir` literal",
+        ))?;
+        Ok(Self {
+            span: sysfs_attr.span,
+            meta_attrs: sysfs_attr.meta_attrs,
+            fn_vis: sysfs_attr.fn_vis,
+            attr_name: sysfs_attr.attr_name,
+            attr_path_args: sysfs_attr.attr_path_args,
+            sysfs_dir,
+            format_fn: setter.format_fn,
+            from_ident: setter.from_ident,
+            from_type: setter.from_type,
+        })
     }
 }
 
