@@ -1,22 +1,20 @@
 #![allow(dead_code)]
+#![allow(clippy::unit_arg)]
 
 mod patterns;
-
-use std::collections::HashMap;
 
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{format_ident, quote_spanned, ToTokens};
-use syn::parse::{Parse, ParseStream, Parser};
+use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
-    braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, ExprLit, FnArg,
-    Ident, Lit, LitStr, Meta, MetaList, MetaNameValue, Pat, PatIdent, PatType, Token, Type,
-    Visibility,
+    braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, FnArg, Ident,
+    Lit, LitStr, Pat, PatIdent, PatType, Token, Type, Visibility,
 };
 
-use self::patterns::Items;
+use self::patterns::{parse_attribute_by_name, Items};
 
 mod kw {
     syn::custom_keyword!(sysfs_attr);
@@ -298,8 +296,8 @@ pub fn impl_sysfs_attrs(tokens: TokenStream1) -> TokenStream1 {
 
 struct AttrItemMod {
     span: Span,
+    attr: Attribute,
     attrs: Vec<Attribute>,
-    // args: Option<HashMap<Ident, Expr>>,
     sysfs_dir: Option<LitStr>,
     vis: Visibility,
     unsafety: Option<Token![unsafe]>,
@@ -311,58 +309,23 @@ struct AttrItemMod {
 impl Parse for AttrItemMod {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut attrs = Attribute::parse_outer(input)?;
-        let macro_attr_index = attrs.iter().position(|attr| {
-            matches!(&attr.meta,
-                Meta::Path(path)
-                | Meta::List(MetaList {
-                    path,
-                    delimiter: syn::MacroDelimiter::Paren(_),
-                    ..
-                })
-                if path.get_ident().map(
-                    |ident| ident == "sysfs_attrs"
-                ) == Some(true)
-            )
-        });
-        let macro_attr = macro_attr_index.map(|index| attrs.remove(index));
-        let mut macro_attr_args = macro_attr
-            .and_then(|attr| match attr.meta {
-                Meta::List(MetaList {
-                    delimiter: syn::MacroDelimiter::Paren(_),
-                    tokens,
-                    ..
-                }) => Some(tokens),
-                _ => None,
-            })
-            .and_then(|tokens| {
-                Punctuated::<MetaNameValue, Token![,]>::parse_terminated
-                    .parse2(tokens)
-                    .ok()
-            })
-            .and_then(|punc| {
-                punc.into_iter()
-                    .map(|MetaNameValue { path, value, .. }| {
-                        let ident = path.require_ident()?.clone();
-                        let key = ident.to_string();
-                        Ok((key, (ident, value)))
-                    })
-                    .collect::<syn::Result<HashMap<String, (Ident, Expr)>>>()
-                    .ok()
-            });
+        let attr = parse_attribute_by_name("sysfs_attrs", &mut attrs)?;
+
+        let mut sysfs_dir = None;
+
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("sysfs_dir") {
+                Ok(sysfs_dir = meta.value()?.parse()?)
+            } else {
+                Err(meta.error("unsupported attribute"))
+            }
+        })?;
 
         Ok(AttrItemMod {
             span: input.span(),
+            attr,
             attrs,
-            // args: macro_attr_args,
-            sysfs_dir: macro_attr_args.as_mut().and_then(|map| {
-                map.remove("sysfs_dir").map(|(_, expr)| match expr {
-                    Expr::Lit(ExprLit {
-                        lit: Lit::Str(sysfs_dir),
-                        ..
-                    }) => sysfs_dir,
-                    _ => todo!(),
-                })
-            }),
+            sysfs_dir,
             vis: input.parse()?,
             unsafety: input.parse()?,
             mod_token: input.parse()?,
