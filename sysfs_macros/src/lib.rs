@@ -2,8 +2,8 @@
 
 mod patterns;
 
-use proc_macro::TokenStream;
-use proc_macro2::Span;
+use proc_macro::TokenStream as TokenStream1;
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{format_ident, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
@@ -217,7 +217,7 @@ impl TryFrom<AttrItem> for SetterFunction {
 }
 
 impl ToTokens for GetterFunction {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
         let Self {
             span,
             meta_attrs,
@@ -242,7 +242,7 @@ impl ToTokens for GetterFunction {
 }
 
 impl ToTokens for SetterFunction {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
         let Self {
             span,
             meta_attrs,
@@ -268,7 +268,7 @@ impl ToTokens for SetterFunction {
 }
 
 #[proc_macro]
-pub fn impl_sysfs_attrs(tokens: TokenStream) -> TokenStream {
+pub fn impl_sysfs_attrs(tokens: TokenStream1) -> TokenStream1 {
     match parse_macro_input!(tokens as Items<AttrItem>) {
         Items::Braced { brace_token, .. } => {
             Error::new(brace_token.span.span(), "unexpected brace")
@@ -276,7 +276,7 @@ pub fn impl_sysfs_attrs(tokens: TokenStream) -> TokenStream {
                 .into()
         }
         Items::TopLevel { attrs, items } => {
-            let mut tokens = proc_macro2::TokenStream::new();
+            let mut tokens = TokenStream2::new();
             for attr in attrs {
                 attr.to_tokens(&mut tokens)
             }
@@ -338,7 +338,7 @@ mod tests {
     #[rustfmt::skip]
     macro_rules! test_roundtrip {
         ({ $($input:tt)* } => $parse_ty:ty) => {{
-            let mut tokens = proc_macro2::TokenStream::new();
+            let mut tokens = TokenStream2::new();
             let parsed: $parse_ty = parse_quote!($($input)*);
             parsed.to_tokens(&mut tokens);
             println!("parsed {}: {}", stringify!($parse_ty), tokens)
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn readonly_sysfs_attr_roundtrips() {
-        let mut tokens = proc_macro2::TokenStream::new();
+        let mut tokens = TokenStream2::new();
         let sysfs_attr: AttrItem = parse_quote! {
             pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| text.parse().unwrap() => f32,
@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn readwrite_sysfs_attr_roundtrips() {
-        let mut tokens = proc_macro2::TokenStream::new();
+        let mut tokens = TokenStream2::new();
         let sysfs_attr: AttrItem = parse_quote! {
             pub sysfs_attr some_write_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| text.parse().unwrap() => f32,
