@@ -13,7 +13,7 @@ use syn::{
     Lit, LitStr, Pat, PatIdent, PatType, Token, Type, Visibility,
 };
 
-use self::patterns::MaybeBracedItems;
+use self::patterns::Items;
 
 mod kw {
     syn::custom_keyword!(sysfs_attr);
@@ -269,25 +269,27 @@ impl ToTokens for SetterFunction {
 
 #[proc_macro]
 pub fn impl_sysfs_attrs(tokens: TokenStream) -> TokenStream {
-    let MaybeBracedItems {
-        brace_token, items, ..
-    } = parse_macro_input!(tokens as MaybeBracedItems<AttributeItem>);
-
-    if let Some(brace) = brace_token {
-        Error::new(brace.span.span(), "unexpected brace")
-            .to_compile_error()
-            .into()
-    } else {
-        let mut tokens = proc_macro2::TokenStream::new();
-        for sysfs_attr in items {
-            if let Ok(getter) = GetterFunction::try_from(sysfs_attr.clone()) {
-                tokens.extend(quote_spanned!(getter.span => #getter));
-            }
-            if let Ok(setter) = SetterFunction::try_from(sysfs_attr.clone()) {
-                tokens.extend(quote_spanned!(setter.span => #setter));
-            }
+    match parse_macro_input!(tokens as Items<AttributeItem>) {
+        Items::Braced { brace_token, .. } => {
+            Error::new(brace_token.span.span(), "unexpected brace")
+                .to_compile_error()
+                .into()
         }
-        tokens.into()
+        Items::TopLevel { attrs, items } => {
+            let mut tokens = proc_macro2::TokenStream::new();
+            for attr in attrs {
+                attr.to_tokens(&mut tokens)
+            }
+            for sysfs_attr in items {
+                if let Ok(getter) = GetterFunction::try_from(sysfs_attr.clone()) {
+                    tokens.extend(quote_spanned!(getter.span => #getter));
+                }
+                if let Ok(setter) = SetterFunction::try_from(sysfs_attr.clone()) {
+                    tokens.extend(quote_spanned!(setter.span => #setter));
+                }
+            }
+            tokens.into()
+        }
     }
 }
 
