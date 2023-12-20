@@ -6,10 +6,9 @@ use quote::{format_ident, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::token::{Colon, Comma, FatArrow, In};
 use syn::{
     braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, FnArg, Ident,
-    Lit, LitStr, Pat, PatIdent, PatType, Type, Visibility,
+    Lit, LitStr, Pat, PatIdent, PatType, Token, Type, Visibility,
 };
 
 mod kw {
@@ -24,7 +23,7 @@ struct AttributeItem {
     meta_attrs: Vec<Attribute>,
     fn_vis: Visibility,
     attr_name: Ident,
-    attr_path_args: Punctuated<FnArg, Comma>,
+    attr_path_args: Punctuated<FnArg, Token![,]>,
     sysfs_dir: Option<LitStr>,
     getter: Option<GetterSignature>,
     setter: Option<SetterSignature>,
@@ -44,7 +43,7 @@ struct GetterFunction {
     meta_attrs: Vec<Attribute>,
     fn_vis: Visibility,
     attr_name: Ident,
-    attr_path_args: Punctuated<FnArg, Comma>,
+    attr_path_args: Punctuated<FnArg, Token![,]>,
     sysfs_dir: LitStr,
     parse_fn: Expr,
     into_type: Box<Type>,
@@ -63,7 +62,7 @@ struct SetterFunction {
     meta_attrs: Vec<Attribute>,
     fn_vis: Visibility,
     attr_name: Ident,
-    attr_path_args: Punctuated<FnArg, Comma>,
+    attr_path_args: Punctuated<FnArg, Token![,]>,
     sysfs_dir: LitStr,
     format_fn: ExprClosure,
     from_ident: Ident,
@@ -80,9 +79,9 @@ impl Parse for AttributeItem {
             attr_path_args: {
                 let args;
                 parenthesized!(args in input);
-                args.parse_terminated(FnArg::parse, Comma)?
+                args.parse_terminated(FnArg::parse, Token![,])?
             },
-            sysfs_dir: In::parse(input)
+            sysfs_dir: <Token![in]>::parse(input)
                 .ok()
                 .map(|_| match Lit::parse(input) {
                     Ok(Lit::Str(sysfs_path)) => Ok(sysfs_path),
@@ -98,16 +97,16 @@ impl Parse for AttributeItem {
 
         if braced.peek(kw::read) {
             kw::read::parse(&braced)?;
-            Colon::parse(&braced)?;
+            <Token![:]>::parse(&braced)?;
             sysfs_attr.getter = Some(braced.parse()?);
-            Comma::parse(&braced)?;
+            <Token![,]>::parse(&braced)?;
         }
 
         if braced.peek(kw::write) {
             kw::write::parse(&braced)?;
-            Colon::parse(&braced)?;
+            <Token![:]>::parse(&braced)?;
             sysfs_attr.setter = Some(braced.parse()?);
-            Comma::parse(&braced)?;
+            <Token![,]>::parse(&braced)?;
         }
 
         Ok(sysfs_attr)
@@ -132,7 +131,7 @@ impl Parse for GetterSignature {
             span: expr.span(),
             parse_fn: expr,
             into_type: {
-                FatArrow::parse(input)?;
+                <Token![=>]>::parse(input)?;
                 Box::new(Type::parse(input)?)
             },
         })
