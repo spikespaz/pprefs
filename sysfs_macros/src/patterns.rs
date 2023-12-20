@@ -1,9 +1,10 @@
-use syn::braced;
 use syn::parse::{Parse, ParseStream};
 use syn::token::Brace;
+use syn::{braced, Attribute};
 
 pub(crate) struct MaybeBracedItems<T> {
     pub brace_token: Option<Brace>,
+    pub attrs: Vec<Attribute>,
     pub items: Vec<T>,
 }
 
@@ -16,12 +17,21 @@ impl<T: Parse> Parse for MaybeBracedItems<T> {
         } else {
             (None, input)
         };
+        let attrs = if brace_token.is_some() {
+            Attribute::parse_inner(input)?
+        } else {
+            Vec::new()
+        };
 
         let mut items = Vec::new();
         while !content.is_empty() {
             items.push(input.parse()?);
         }
 
-        Ok(Self { brace_token, items })
+        Ok(Self {
+            brace_token,
+            attrs,
+            items,
+        })
     }
 }

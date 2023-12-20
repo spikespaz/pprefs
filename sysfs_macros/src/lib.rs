@@ -269,8 +269,9 @@ impl ToTokens for SetterFunction {
 
 #[proc_macro]
 pub fn impl_sysfs_attrs(tokens: TokenStream) -> TokenStream {
-    let MaybeBracedItems { brace_token, items } =
-        parse_macro_input!(tokens as MaybeBracedItems<AttributeItem>);
+    let MaybeBracedItems {
+        brace_token, items, ..
+    } = parse_macro_input!(tokens as MaybeBracedItems<AttributeItem>);
 
     if let Some(brace) = brace_token {
         Error::new(brace.span.span(), "unexpected brace")
