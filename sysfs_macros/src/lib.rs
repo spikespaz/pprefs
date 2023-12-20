@@ -269,19 +269,25 @@ impl ToTokens for SetterFunction {
 
 #[proc_macro]
 pub fn impl_sysfs_attrs(tokens: TokenStream) -> TokenStream {
-    let items = parse_macro_input!(tokens as MaybeBracedItems<AttributeItem>).items;
-    let mut tokens = proc_macro2::TokenStream::new();
+    let MaybeBracedItems { brace_token, items } =
+        parse_macro_input!(tokens as MaybeBracedItems<AttributeItem>);
 
-    for sysfs_attr in items {
-        if let Ok(getter) = GetterFunction::try_from(sysfs_attr.clone()) {
-            tokens.extend(quote_spanned!(getter.span => #getter));
+    if let Some(brace) = brace_token {
+        Error::new(brace.span.span(), "unexpected brace")
+            .to_compile_error()
+            .into()
+    } else {
+        let mut tokens = proc_macro2::TokenStream::new();
+        for sysfs_attr in items {
+            if let Ok(getter) = GetterFunction::try_from(sysfs_attr.clone()) {
+                tokens.extend(quote_spanned!(getter.span => #getter));
+            }
+            if let Ok(setter) = SetterFunction::try_from(sysfs_attr.clone()) {
+                tokens.extend(quote_spanned!(setter.span => #setter));
+            }
         }
-        if let Ok(setter) = SetterFunction::try_from(sysfs_attr.clone()) {
-            tokens.extend(quote_spanned!(setter.span => #setter));
-        }
+        tokens.into()
     }
-
-    tokens.into()
 }
 
 #[cfg(test)]
