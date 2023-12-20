@@ -6,6 +6,7 @@ use quote::{format_ident, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
+use syn::token::Brace;
 use syn::{
     braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, FnArg, Ident,
     Lit, LitStr, Pat, PatIdent, PatType, Token, Type, Visibility,
@@ -29,7 +30,10 @@ struct AttributeItem {
     setter: Option<SetterSignature>,
 }
 
-struct AttributeItems(Vec<AttributeItem>);
+struct AttributeItems {
+    brace_token: Option<Brace>,
+    items: Vec<AttributeItem>,
+}
 
 #[derive(Clone)]
 struct GetterSignature {
@@ -115,11 +119,20 @@ impl Parse for AttributeItem {
 
 impl Parse for AttributeItems {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        let look = input.lookahead1();
+        let content;
+        let (brace_token, content) = if look.peek(Brace) {
+            (Some(braced!(content in input)), &content)
+        } else {
+            (None, input)
+        };
+
         let mut items = Vec::new();
-        while !input.is_empty() {
+        while !content.is_empty() {
             items.push(input.parse()?);
         }
-        Ok(Self(items))
+
+        Ok(Self { brace_token, items })
     }
 }
 
@@ -277,7 +290,7 @@ impl ToTokens for SetterFunction {
 
 #[proc_macro]
 pub fn impl_sysfs_attrs(tokens: TokenStream) -> TokenStream {
-    let AttributeItems(items) = parse_macro_input!(tokens as AttributeItems);
+    let items = parse_macro_input!(tokens as AttributeItems).items;
     let mut tokens = proc_macro2::TokenStream::new();
 
     for sysfs_attr in items {
