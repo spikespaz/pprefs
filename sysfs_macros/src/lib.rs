@@ -22,7 +22,7 @@ mod kw {
 }
 
 #[derive(Clone)]
-struct AttributeItem {
+struct AttrItem {
     span: Span,
     meta_attrs: Vec<Attribute>,
     fn_vis: Visibility,
@@ -71,7 +71,7 @@ struct SetterFunction {
     from_type: Box<Type>,
 }
 
-impl Parse for AttributeItem {
+impl Parse for AttrItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut sysfs_attr = Self {
             span: input.span(),
@@ -165,10 +165,10 @@ impl Parse for SetterSignature {
     }
 }
 
-impl TryFrom<AttributeItem> for GetterFunction {
+impl TryFrom<AttrItem> for GetterFunction {
     type Error = Error;
 
-    fn try_from(sysfs_attr: AttributeItem) -> Result<Self, Self::Error> {
+    fn try_from(sysfs_attr: AttrItem) -> Result<Self, Self::Error> {
         let getter = sysfs_attr.getter.ok_or(Error::new(
             sysfs_attr.span,
             "provided `AttributeItem` has no `getter` closure",
@@ -190,10 +190,10 @@ impl TryFrom<AttributeItem> for GetterFunction {
     }
 }
 
-impl TryFrom<AttributeItem> for SetterFunction {
+impl TryFrom<AttrItem> for SetterFunction {
     type Error = Error;
 
-    fn try_from(sysfs_attr: AttributeItem) -> Result<Self, Self::Error> {
+    fn try_from(sysfs_attr: AttrItem) -> Result<Self, Self::Error> {
         let setter = sysfs_attr.setter.ok_or(Error::new(
             sysfs_attr.span,
             "provided `AttributeItem` has no `setter` closure",
@@ -269,7 +269,7 @@ impl ToTokens for SetterFunction {
 
 #[proc_macro]
 pub fn impl_sysfs_attrs(tokens: TokenStream) -> TokenStream {
-    match parse_macro_input!(tokens as Items<AttributeItem>) {
+    match parse_macro_input!(tokens as Items<AttrItem>) {
         Items::Braced { brace_token, .. } => {
             Error::new(brace_token.span.span(), "unexpected brace")
                 .to_compile_error()
@@ -299,7 +299,7 @@ struct AttrItemMod {
     unsafety: Option<Token![unsafe]>,
     mod_token: Token![mod],
     ident: Ident,
-    items: Items<AttributeItem>,
+    items: Items<AttrItem>,
     // sysfs_dir: Option<LitStr>,
 }
 
@@ -349,7 +349,7 @@ mod tests {
     fn empty_sysfs_attr_parses() {
         test_parse!({
             pub sysfs_attr some_useless_attr(item: usize) in "/fake/sysfs/path/item{item}" {}
-        } => AttributeItem);
+        } => AttrItem);
     }
 
     #[test]
@@ -358,7 +358,7 @@ mod tests {
             pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| text.parse().unwrap() => f32,
             }
-        } => AttributeItem);
+        } => AttrItem);
     }
 
     #[test]
@@ -368,7 +368,7 @@ mod tests {
                 read: |text| text.parse().unwrap() => bool,
                 write: |value: bool| format_args!("{}", value as u8),
             }
-        } => AttributeItem);
+        } => AttrItem);
     }
 
     #[test]
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn readonly_sysfs_attr_roundtrips() {
         let mut tokens = proc_macro2::TokenStream::new();
-        let sysfs_attr: AttributeItem = parse_quote! {
+        let sysfs_attr: AttrItem = parse_quote! {
             pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| text.parse().unwrap() => f32,
             }
@@ -408,7 +408,7 @@ mod tests {
     #[test]
     fn readwrite_sysfs_attr_roundtrips() {
         let mut tokens = proc_macro2::TokenStream::new();
-        let sysfs_attr: AttributeItem = parse_quote! {
+        let sysfs_attr: AttrItem = parse_quote! {
             pub sysfs_attr some_write_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| text.parse().unwrap() => f32,
                 write: |value: f32| fornat!("{value}"),
