@@ -293,6 +293,29 @@ pub fn impl_sysfs_attrs(tokens: TokenStream) -> TokenStream {
     }
 }
 
+struct AttrItemMod {
+    attrs: Vec<Attribute>,
+    vis: Visibility,
+    unsafety: Option<Token![unsafe]>,
+    mod_token: Token![mod],
+    ident: Ident,
+    items: Items<AttributeItem>,
+    // sysfs_dir: Option<LitStr>,
+}
+
+impl Parse for AttrItemMod {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(AttrItemMod {
+            attrs: Attribute::parse_outer(input)?,
+            vis: input.parse()?,
+            unsafety: input.parse()?,
+            mod_token: input.parse()?,
+            ident: input.parse()?,
+            items: input.parse()?,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use syn::parse_quote;
@@ -398,5 +421,19 @@ mod tests {
             .unwrap_or_else(|error| panic!("{}", error))
             .to_tokens(&mut tokens);
         eprintln!("parsed {}: {}", stringify!(GetterFunction), tokens)
+    }
+
+    #[test]
+    fn attr_mod_parses() {
+        test_parse!({
+            #[sysfs_attrs]
+            pub mod cpufreq {
+                /// This example is from the linux kernel.
+                pub sysfs_attr scaling_max_freq(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
+                    read: |text| text.parse().unwrap() => usize,
+                    write: |freq: usize| format!("{freq}"),
+                }
+            }
+        } => AttrItemMod);
     }
 }
