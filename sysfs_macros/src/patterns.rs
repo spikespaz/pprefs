@@ -1,7 +1,6 @@
-use proc_macro2::Span;
 use syn::parse::{Parse, ParseStream};
 use syn::token::Brace;
-use syn::{braced, Attribute, Error, Meta, MetaList};
+use syn::{braced, Attribute, Meta, MetaList};
 
 pub(crate) enum Items<T> {
     Braced {
@@ -13,6 +12,20 @@ pub(crate) enum Items<T> {
         attrs: Vec<Attribute>,
         items: Vec<T>,
     },
+}
+
+impl<T> Items<T> {
+    pub fn items(&self) -> &Vec<T> {
+        match self {
+            Self::Braced { items, .. } | Self::TopLevel { items, .. } => items,
+        }
+    }
+
+    pub fn attrs(&self) -> &Vec<Attribute> {
+        match self {
+            Self::Braced { attrs, .. } | Self::TopLevel { attrs, .. } => attrs,
+        }
+    }
 }
 
 impl<T: Parse> Items<T> {
