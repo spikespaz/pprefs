@@ -10,8 +10,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
-    braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, FnArg, Ident,
-    Lit, LitStr, Meta, Pat, PatIdent, PatType, Token, Type, Visibility,
+    braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, ExprLit, FnArg,
+    Ident, Lit, LitStr, Meta, MetaNameValue, Pat, PatIdent, PatType, Token, Type, Visibility,
 };
 
 use self::patterns::{parse_attribute_by_name, Items};
@@ -294,6 +294,35 @@ pub fn impl_sysfs_attrs(tokens: TokenStream1) -> TokenStream1 {
     }
 }
 
+#[derive(Default)]
+struct AttrItemModArgs {
+    sysfs_dir: Option<LitStr>,
+}
+
+impl Parse for AttrItemModArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut sysfs_dir = None;
+
+        let meta = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
+        meta.into_iter().try_for_each(|nested| match nested {
+            Meta::NameValue(MetaNameValue { path, value, .. }) if path.is_ident("sysfs_dir") => {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Str(literal),
+                    ..
+                }) = value
+                {
+                    Ok(sysfs_dir = Some(literal))
+                } else {
+                    Err(Error::new(value.span(), "expected a string literal"))
+                }
+            }
+            _ => Err(Error::new(nested.span(), "unknown meta")),
+        })?;
+
+        Ok(Self { sysfs_dir })
+    }
+}
+
 struct AttrItemMod {
     span: Span,
     attr: Option<Attribute>,
@@ -474,5 +503,12 @@ mod tests {
                 }
             }
         };
+    }
+
+    #[test]
+    fn attr_item_mod_args_parses() {
+        let args: AttrItemModArgs = parse_quote!(sysfs_dir = "/some/sysfs/dir");
+        let sysfs_dir = args.sysfs_dir.unwrap().value();
+        assert_eq!(sysfs_dir, "/some/sysfs/dir");
     }
 }
