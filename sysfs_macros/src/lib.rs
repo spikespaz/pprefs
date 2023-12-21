@@ -11,7 +11,7 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
     braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, FnArg, Ident,
-    Lit, LitStr, Pat, PatIdent, PatType, Token, Type, Visibility,
+    Lit, LitStr, Meta, Pat, PatIdent, PatType, Token, Type, Visibility,
 };
 
 use self::patterns::{parse_attribute_by_name, Items};
@@ -313,8 +313,12 @@ impl Parse for AttrItemMod {
 
         let mut sysfs_dir = None;
 
-        if let Some(attr) = &attr {
-            attr.parse_nested_meta(|meta| {
+        if let Some(Attribute {
+            meta: Meta::List(list),
+            ..
+        }) = &attr
+        {
+            list.parse_nested_meta(|meta| {
                 if meta.path.is_ident("sysfs_dir") {
                     Ok(sysfs_dir = meta.value()?.parse()?)
                 } else {
@@ -460,7 +464,7 @@ mod tests {
 
     #[test]
     fn attr_mod_with_args_parses() {
-        test_parse!({
+        let _: AttrItemMod = parse_quote! {
             #[sysfs_attrs(sysfs_dir = "/sys/devices/system/cpu/cpufreq/policy{cpu}")]
             pub mod cpufreq {
                 /// This example is from the linux kernel.
@@ -469,6 +473,6 @@ mod tests {
                     write: |freq: usize| format!("{freq}"),
                 }
             }
-        } => AttrItemMod);
+        };
     }
 }
