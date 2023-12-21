@@ -326,30 +326,41 @@ impl Parse for AttrItemModArgs {
 
 struct AttrItemMod {
     span: Span,
+    attrs: Vec<Attribute>,
     vis: Visibility,
     unsafety: Option<Token![unsafe]>,
     mod_token: Token![mod],
     ident: Ident,
-    items: (Brace, Vec<AttrItem>),
+    brace: Brace,
+    items: Vec<AttrItem>,
 }
 
 impl Parse for AttrItemMod {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut attrs = Attribute::parse_outer(input)?;
+        let vis = input.parse()?;
+        let unsafety = input.parse()?;
+        let mod_token = input.parse()?;
+        let ident = input.parse()?;
+        let (brace, items) = {
+            let braced;
+            let brace = braced!(braced in input);
+            attrs.append(&mut Attribute::parse_inner(&braced)?);
+            let mut items = Vec::new();
+            while !braced.is_empty() {
+                items.push(braced.parse()?)
+            }
+            (brace, items)
+        };
         Ok(AttrItemMod {
             span: input.span(),
-            vis: input.parse()?,
-            unsafety: input.parse()?,
-            mod_token: input.parse()?,
-            ident: input.parse()?,
-            items: {
-                let braced;
-                let brace = braced!(braced in input);
-                let mut items = Vec::new();
-                while !braced.is_empty() {
-                    items.push(braced.parse()?)
-                }
-                (brace, items)
-            },
+            attrs,
+            vis,
+            unsafety,
+            mod_token,
+            brace,
+            ident,
+            items,
         })
     }
 }
