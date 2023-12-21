@@ -9,12 +9,13 @@ use quote::{format_ident, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
+use syn::token::Brace;
 use syn::{
     braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, ExprLit, FnArg,
     Ident, Lit, LitStr, Meta, MetaNameValue, Pat, PatIdent, PatType, Token, Type, Visibility,
 };
 
-use self::patterns::{parse_attribute_by_name, Items};
+use self::patterns::Items;
 
 mod kw {
     syn::custom_keyword!(sysfs_attr);
@@ -325,47 +326,30 @@ impl Parse for AttrItemModArgs {
 
 struct AttrItemMod {
     span: Span,
-    attr: Option<Attribute>,
-    attrs: Vec<Attribute>,
-    sysfs_dir: Option<LitStr>,
     vis: Visibility,
     unsafety: Option<Token![unsafe]>,
     mod_token: Token![mod],
     ident: Ident,
-    items: Items<AttrItem>,
+    items: (Brace, Vec<AttrItem>),
 }
 
 impl Parse for AttrItemMod {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut attrs = Attribute::parse_outer(input)?;
-        let attr = parse_attribute_by_name("sysfs_attrs", &mut attrs);
-
-        let mut sysfs_dir = None;
-
-        if let Some(Attribute {
-            meta: Meta::List(list),
-            ..
-        }) = &attr
-        {
-            list.parse_nested_meta(|meta| {
-                if meta.path.is_ident("sysfs_dir") {
-                    Ok(sysfs_dir = meta.value()?.parse()?)
-                } else {
-                    Err(meta.error("unsupported attribute"))
-                }
-            })?;
-        }
-
         Ok(AttrItemMod {
             span: input.span(),
-            attr,
-            attrs,
-            sysfs_dir,
             vis: input.parse()?,
             unsafety: input.parse()?,
             mod_token: input.parse()?,
             ident: input.parse()?,
-            items: input.parse()?,
+            items: {
+                let braced;
+                let brace = braced!(braced in input);
+                let mut items = Vec::new();
+                while !braced.is_empty() {
+                    items.push(braced.parse()?)
+                }
+                (brace, items)
+            },
         })
     }
 }
@@ -480,7 +464,6 @@ mod tests {
     #[test]
     fn attr_mod_parses() {
         test_parse!({
-            #[sysfs_attrs]
             pub mod cpufreq {
                 /// This example is from the linux kernel.
                 pub sysfs_attr scaling_max_freq(cpu: usize) in "{SYSFS_DIR}/policy{cpu}" {
@@ -491,19 +474,19 @@ mod tests {
         } => AttrItemMod);
     }
 
-    #[test]
-    fn attr_mod_with_args_parses() {
-        let _: AttrItemMod = parse_quote! {
-            #[sysfs_attrs(sysfs_dir = "/sys/devices/system/cpu/cpufreq/policy{cpu}")]
-            pub mod cpufreq {
-                /// This example is from the linux kernel.
-                pub sysfs_attr scaling_max_freq(cpu: usize) {
-                    read: |text| text.parse().unwrap() => usize,
-                    write: |freq: usize| format!("{freq}"),
-                }
-            }
-        };
-    }
+    // #[test]
+    // fn attr_mod_with_args_parses() {
+    //     let _: AttrItemMod = parse_quote! {
+    //         #[sysfs_attrs(sysfs_dir = "/sys/devices/system/cpu/cpufreq/policy{cpu}")]
+    //         pub mod cpufreq {
+    //             /// This example is from the linux kernel.
+    //             pub sysfs_attr scaling_max_freq(cpu: usize) {
+    //                 read: |text| text.parse().unwrap() => usize,
+    //                 write: |freq: usize| format!("{freq}"),
+    //             }
+    //         }
+    //     };
+    // }
 
     #[test]
     fn attr_item_mod_args_parses() {
