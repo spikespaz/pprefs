@@ -59,23 +59,15 @@ impl<T: Parse> Parse for Items<T> {
 pub(crate) fn parse_attribute_by_name(
     attr_name: impl AsRef<str>,
     attrs: &mut Vec<Attribute>,
-) -> syn::Result<Attribute> {
-    let attr_index = attrs
-        .iter()
-        .position(|attr| {
-            matches!(&attr.meta,
-                Meta::Path(path) | Meta::List(MetaList {
-                    path,
-                    delimiter: syn::MacroDelimiter::Paren(_),
-                    ..
-                }) if path.is_ident(attr_name.as_ref())
-            )
-        })
-        .ok_or_else(|| {
-            Error::new(
-                Span::call_site(),
-                format!("unable to find attribute `{}`", attr_name.as_ref()),
-            )
-        })?;
-    Ok(attrs.remove(attr_index))
+) -> Option<Attribute> {
+    let attr_index = attrs.iter().position(|attr| {
+        matches!(&attr.meta,
+            Meta::Path(path) | Meta::List(MetaList {
+                path,
+                delimiter: syn::MacroDelimiter::Paren(_),
+                ..
+            }) if path.is_ident(attr_name.as_ref())
+        )
+    })?;
+    Some(attrs.remove(attr_index))
 }

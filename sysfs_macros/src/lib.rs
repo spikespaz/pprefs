@@ -296,7 +296,7 @@ pub fn impl_sysfs_attrs(tokens: TokenStream1) -> TokenStream1 {
 
 struct AttrItemMod {
     span: Span,
-    attr: Attribute,
+    attr: Option<Attribute>,
     attrs: Vec<Attribute>,
     sysfs_dir: Option<LitStr>,
     vis: Visibility,
@@ -309,17 +309,19 @@ struct AttrItemMod {
 impl Parse for AttrItemMod {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut attrs = Attribute::parse_outer(input)?;
-        let attr = parse_attribute_by_name("sysfs_attrs", &mut attrs)?;
+        let attr = parse_attribute_by_name("sysfs_attrs", &mut attrs);
 
         let mut sysfs_dir = None;
 
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("sysfs_dir") {
-                Ok(sysfs_dir = meta.value()?.parse()?)
-            } else {
-                Err(meta.error("unsupported attribute"))
-            }
-        })?;
+        if let Some(attr) = &attr {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("sysfs_dir") {
+                    Ok(sysfs_dir = meta.value()?.parse()?)
+                } else {
+                    Err(meta.error("unsupported attribute"))
+                }
+            })?;
+        }
 
         Ok(AttrItemMod {
             span: input.span(),
