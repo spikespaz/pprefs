@@ -365,6 +365,11 @@ impl Parse for ItemSysfsMod {
     }
 }
 
+#[proc_macro_attribute]
+pub fn sysfs(args: TokenStream1, items: TokenStream1) -> TokenStream1 {
+    TokenStream1::new()
+}
+
 #[cfg(test)]
 mod tests {
     use syn::parse_quote;

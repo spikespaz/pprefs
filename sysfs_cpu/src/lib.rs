@@ -1,6 +1,5 @@
 //! <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#policy-interface-in-sysfs>
 use sysfs::Result;
-use sysfs_macros::impl_sysfs_attrs;
 
 pub static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
 
@@ -21,7 +20,9 @@ pub fn num_cpus() -> Result<usize> {
     })
 }
 
-impl_sysfs_attrs! {
+pub mod cpufreq {
+    use sysfs_macros::sysfs;
+
     /// List of online CPUs belonging to this policy (i.e. sharing the
     /// hardware performance scaling interface represented by the policyX
     /// policy object).
