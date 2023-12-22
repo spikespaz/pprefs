@@ -6,13 +6,14 @@ mod patterns;
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{format_ident, quote_spanned, ToTokens};
-use syn::parse::{Parse, ParseStream};
+use syn::parse::{Parse, ParseStream, Parser};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Brace;
 use syn::{
     braced, parenthesized, parse_macro_input, Attribute, Error, Expr, ExprClosure, ExprLit, FnArg,
-    Ident, Lit, LitStr, Meta, MetaNameValue, Pat, PatIdent, PatType, Token, Type, Visibility,
+    Ident, ItemFn, Lit, LitStr, Meta, MetaNameValue, Pat, PatIdent, PatType, Token, Type,
+    Visibility,
 };
 
 use self::patterns::Items;
@@ -365,8 +366,35 @@ impl Parse for ItemSysfsMod {
     }
 }
 
+#[derive(Default)]
+struct SysfsAttrArgs {
+    sysfs_dir: Option<LitStr>,
+}
+
+impl Parse for SysfsAttrArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.is_empty() {
+            Ok(Self::default())
+        } else if input.peek(Token![in]) {
+            let _in_token = <Token![in]>::parse(input)?;
+            match Lit::parse(input)? {
+                Lit::Str(lit) => Ok(Self {
+                    sysfs_dir: Some(lit),
+                }),
+                lit => Err(Error::new(lit.span(), "expected a literal string")),
+            }
+        } else {
+            // match Punctuated::<Meta, Token![,]>::parse_terminated.parse(input)
+            todo!("parse meta")
+        }
+    }
+}
+
 #[proc_macro_attribute]
-pub fn sysfs(args: TokenStream1, items: TokenStream1) -> TokenStream1 {
+pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
+    let args = parse_macro_input!(args as SysfsAttrArgs);
+    // let item = parse_macro_input!(item as ItemFn);
+
     TokenStream1::new()
 }
 
@@ -397,6 +425,11 @@ mod tests {
             parsed.to_tokens(&mut tokens);
             println!("parsed {}: {}", stringify!($parse_ty), tokens)
         }};
+    }
+
+    #[test]
+    fn sysfs_attr_args_parse_in() {
+        let _: SysfsAttrArgs = parse_quote!(in "/sys/devices/system/cpu");
     }
 
     #[test]
