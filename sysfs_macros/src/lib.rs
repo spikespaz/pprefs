@@ -24,7 +24,7 @@ mod kw {
 }
 
 #[derive(Clone)]
-struct AttrItem {
+struct ItemSysfsAttr {
     span: Span,
     meta_attrs: Vec<Attribute>,
     fn_vis: Visibility,
@@ -73,7 +73,7 @@ struct SetterFunction {
     from_type: Box<Type>,
 }
 
-impl Parse for AttrItem {
+impl Parse for ItemSysfsAttr {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut sysfs_attr = Self {
             span: input.span(),
@@ -167,10 +167,10 @@ impl Parse for SetterSignature {
     }
 }
 
-impl TryFrom<AttrItem> for GetterFunction {
+impl TryFrom<ItemSysfsAttr> for GetterFunction {
     type Error = Error;
 
-    fn try_from(sysfs_attr: AttrItem) -> Result<Self, Self::Error> {
+    fn try_from(sysfs_attr: ItemSysfsAttr) -> Result<Self, Self::Error> {
         let getter = sysfs_attr.getter.ok_or(Error::new(
             sysfs_attr.span,
             "provided `AttributeItem` has no `getter` closure",
@@ -192,10 +192,10 @@ impl TryFrom<AttrItem> for GetterFunction {
     }
 }
 
-impl TryFrom<AttrItem> for SetterFunction {
+impl TryFrom<ItemSysfsAttr> for SetterFunction {
     type Error = Error;
 
-    fn try_from(sysfs_attr: AttrItem) -> Result<Self, Self::Error> {
+    fn try_from(sysfs_attr: ItemSysfsAttr) -> Result<Self, Self::Error> {
         let setter = sysfs_attr.setter.ok_or(Error::new(
             sysfs_attr.span,
             "provided `AttributeItem` has no `setter` closure",
@@ -271,7 +271,7 @@ impl ToTokens for SetterFunction {
 
 #[proc_macro]
 pub fn impl_sysfs_attrs(tokens: TokenStream1) -> TokenStream1 {
-    match parse_macro_input!(tokens as Items<AttrItem>) {
+    match parse_macro_input!(tokens as Items<ItemSysfsAttr>) {
         Items::Braced { brace_token, .. } => {
             Error::new(brace_token.span.span(), "unexpected brace")
                 .to_compile_error()
@@ -296,11 +296,11 @@ pub fn impl_sysfs_attrs(tokens: TokenStream1) -> TokenStream1 {
 }
 
 #[derive(Default)]
-struct AttrItemModArgs {
+struct SysfsModArgs {
     sysfs_dir: Option<LitStr>,
 }
 
-impl Parse for AttrItemModArgs {
+impl Parse for SysfsModArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut sysfs_dir = None;
 
@@ -324,7 +324,7 @@ impl Parse for AttrItemModArgs {
     }
 }
 
-struct AttrItemMod {
+struct ItemSysfsMod {
     span: Span,
     attrs: Vec<Attribute>,
     vis: Visibility,
@@ -332,10 +332,10 @@ struct AttrItemMod {
     mod_token: Token![mod],
     ident: Ident,
     brace: Brace,
-    items: Vec<AttrItem>,
+    items: Vec<ItemSysfsAttr>,
 }
 
-impl Parse for AttrItemMod {
+impl Parse for ItemSysfsMod {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut attrs = Attribute::parse_outer(input)?;
         let vis = input.parse()?;
@@ -352,7 +352,7 @@ impl Parse for AttrItemMod {
             }
             (brace, items)
         };
-        Ok(AttrItemMod {
+        Ok(ItemSysfsMod {
             span: input.span(),
             attrs,
             vis,
@@ -398,7 +398,7 @@ mod tests {
     fn empty_sysfs_attr_parses() {
         test_parse!({
             pub sysfs_attr some_useless_attr(item: usize) in "/fake/sysfs/path/item{item}" {}
-        } => AttrItem);
+        } => ItemSysfsAttr);
     }
 
     #[test]
@@ -407,7 +407,7 @@ mod tests {
             pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| text.parse().unwrap() => f32,
             }
-        } => AttrItem);
+        } => ItemSysfsAttr);
     }
 
     #[test]
@@ -417,7 +417,7 @@ mod tests {
                 read: |text| text.parse().unwrap() => bool,
                 write: |value: bool| format_args!("{}", value as u8),
             }
-        } => AttrItem);
+        } => ItemSysfsAttr);
     }
 
     #[test]
@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn readonly_sysfs_attr_roundtrips() {
         let mut tokens = TokenStream2::new();
-        let sysfs_attr: AttrItem = parse_quote! {
+        let sysfs_attr: ItemSysfsAttr = parse_quote! {
             pub sysfs_attr some_readonly_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| text.parse().unwrap() => f32,
             }
@@ -457,7 +457,7 @@ mod tests {
     #[test]
     fn readwrite_sysfs_attr_roundtrips() {
         let mut tokens = TokenStream2::new();
-        let sysfs_attr: AttrItem = parse_quote! {
+        let sysfs_attr: ItemSysfsAttr = parse_quote! {
             pub sysfs_attr some_write_attr(item: usize) in "/fake/sysfs/path/item{item}" {
                 read: |text| text.parse().unwrap() => f32,
                 write: |value: f32| fornat!("{value}"),
@@ -482,26 +482,25 @@ mod tests {
                     write: |freq: usize| format!("{freq}"),
                 }
             }
-        } => AttrItemMod);
+        } => ItemSysfsMod);
     }
 
-    // #[test]
-    // fn attr_mod_with_args_parses() {
-    //     let _: AttrItemMod = parse_quote! {
-    //         #[sysfs_attrs(sysfs_dir = "/sys/devices/system/cpu/cpufreq/policy{cpu}")]
-    //         pub mod cpufreq {
-    //             /// This example is from the linux kernel.
-    //             pub sysfs_attr scaling_max_freq(cpu: usize) {
-    //                 read: |text| text.parse().unwrap() => usize,
-    //                 write: |freq: usize| format!("{freq}"),
-    //             }
-    //         }
-    //     };
-    // }
+    #[test]
+    fn attr_mod_with_args_parses() {
+        let _: ItemSysfsMod = parse_quote! {
+            pub mod cpufreq {
+                /// This example is from the linux kernel.
+                pub sysfs_attr scaling_max_freq(cpu: usize) in "" {
+                    read: |text| text.parse().unwrap() => usize,
+                    write: |freq: usize| format!("{freq}"),
+                }
+            }
+        };
+    }
 
     #[test]
     fn attr_item_mod_args_parses() {
-        let args: AttrItemModArgs = parse_quote!(sysfs_dir = "/some/sysfs/dir");
+        let args: SysfsModArgs = parse_quote!(sysfs_dir = "/some/sysfs/dir");
         let sysfs_dir = args.sysfs_dir.unwrap().value();
         assert_eq!(sysfs_dir, "/some/sysfs/dir");
     }
