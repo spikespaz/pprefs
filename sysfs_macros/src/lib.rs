@@ -15,6 +15,38 @@ use syn::{
     RangeLimits, Signature, Stmt, Token, Type, Visibility,
 };
 
+#[derive(Default)]
+struct SysfsAttrArgs {
+    sysfs_dir: Option<LitStr>,
+}
+
+impl Parse for SysfsAttrArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.is_empty() {
+            Ok(Self::default())
+        } else if input.peek(Token![in]) {
+            let _in_token = <Token![in]>::parse(input)?;
+            match Lit::parse(input)? {
+                Lit::Str(lit) => Ok(Self {
+                    sysfs_dir: Some(lit),
+                }),
+                lit => Err(Error::new(lit.span(), "expected a literal string")),
+            }
+        } else {
+            // match Punctuated::<Meta, Token![,]>::parse_terminated.parse(input)
+            todo!("parse meta")
+        }
+    }
+}
+
+#[proc_macro_attribute]
+pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
+    let args = parse_macro_input!(args as SysfsAttrArgs);
+    // let item = parse_macro_input!(item as ItemFn);
+
+    TokenStream1::new()
+}
+
 mod kw {
     syn::custom_keyword!(sysfs_attr);
     syn::custom_keyword!(read);
@@ -252,38 +284,6 @@ impl Parse for SysfsModArgs {
 //         })
 //     }
 // }
-
-#[derive(Default)]
-struct SysfsAttrArgs {
-    sysfs_dir: Option<LitStr>,
-}
-
-impl Parse for SysfsAttrArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        if input.is_empty() {
-            Ok(Self::default())
-        } else if input.peek(Token![in]) {
-            let _in_token = <Token![in]>::parse(input)?;
-            match Lit::parse(input)? {
-                Lit::Str(lit) => Ok(Self {
-                    sysfs_dir: Some(lit),
-                }),
-                lit => Err(Error::new(lit.span(), "expected a literal string")),
-            }
-        } else {
-            // match Punctuated::<Meta, Token![,]>::parse_terminated.parse(input)
-            todo!("parse meta")
-        }
-    }
-}
-
-#[proc_macro_attribute]
-pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
-    let args = parse_macro_input!(args as SysfsAttrArgs);
-    // let item = parse_macro_input!(item as ItemFn);
-
-    TokenStream1::new()
-}
 
 #[cfg(test)]
 mod tests {
