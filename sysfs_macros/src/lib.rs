@@ -5,7 +5,7 @@ mod patterns;
 
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{format_ident, quote_spanned, ToTokens};
+use quote::{format_ident, quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -16,11 +16,11 @@ use syn::{
 };
 
 #[derive(Default)]
-struct SysfsAttrArgs {
+struct ItemSysfsAttrArgs {
     sysfs_dir: Option<LitStr>,
 }
 
-impl Parse for SysfsAttrArgs {
+impl Parse for ItemSysfsAttrArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         if input.is_empty() {
             Ok(Self::default())
@@ -41,28 +41,80 @@ impl Parse for SysfsAttrArgs {
 
 #[proc_macro_attribute]
 pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
-    let args = parse_macro_input!(args as SysfsAttrArgs);
-    // let item = parse_macro_input!(item as ItemFn);
+    let args = parse_macro_input!(args as ItemSysfsAttrArgs);
+    let item = parse_macro_input!(item as ItemFn);
 
-    TokenStream1::new()
+    let ItemSysfsAttrFn {
+        attrs,
+        vis,
+        sig,
+        let_read,
+        let_write,
+        dots,
+        block,
+    } = match ItemSysfsAttrFn::try_from(item) {
+        Ok(item) => item,
+        Err(e) => return e.to_compile_error().into(),
+    };
+
+    let mut body = TokenStream2::new();
+
+    if let Some((local, _)) = let_read {
+        local.to_tokens(&mut body)
+    }
+
+    if let Some((local, _)) = let_write {
+        local.to_tokens(&mut body)
+    }
+
+    quote! {
+        #(#attrs)*
+        #vis #sig {
+            #body
+        }
+    }
+    .into()
+    // TokenStream1::new()
+}
+
+#[derive(Clone)]
+struct ItemSysfsAttrFn {
+    attrs: Vec<Attribute>,
+    vis: Visibility,
+    sig: Signature,
+    let_read: Option<(Local, Box<Expr>)>,
+    let_write: Option<(Local, Box<Expr>)>,
+    dots: Token![..],
+    block: Box<Block>,
+}
+
+impl TryFrom<ItemFn> for ItemSysfsAttrFn {
+    type Error = Error;
+
+    fn try_from(
+        ItemFn {
+            attrs,
+            vis,
+            sig,
+            block,
+        }: ItemFn,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            attrs,
+            vis,
+            sig,
+            let_read: Default::default(),
+            let_write: Default::default(),
+            dots: Default::default(),
+            block,
+        })
+    }
 }
 
 mod kw {
     syn::custom_keyword!(sysfs_attr);
     syn::custom_keyword!(read);
     syn::custom_keyword!(write);
-}
-
-#[derive(Clone)]
-struct ItemSysfsAttr {
-    span: Span,
-    meta_attrs: Vec<Attribute>,
-    fn_vis: Visibility,
-    attr_name: Ident,
-    attr_path_args: Punctuated<FnArg, Token![,]>,
-    sysfs_dir: Option<LitStr>,
-    getter: Option<GetterSignature>,
-    setter: Option<SetterSignature>,
 }
 
 #[derive(Clone)]
