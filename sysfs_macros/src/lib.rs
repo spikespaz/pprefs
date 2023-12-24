@@ -24,37 +24,10 @@ pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
     let args = parse_macro_input!(args as SysfsAttrArgs);
     let item = parse_macro_input!(item as ItemFn);
 
-    let ItemSysfsAttrFn {
-        attrs,
-        vis,
-        sig,
-        let_read,
-        let_write,
-        dots,
-        block,
-    } = match ItemSysfsAttrFn::try_from(item) {
-        Ok(item) => item,
-        Err(e) => return e.to_compile_error().into(),
-    };
-
-    let mut body = TokenStream2::new();
-
-    if let Some(stmt) = let_read {
-        stmt.to_tokens(&mut body)
+    match sysfs_attr(args, item) {
+        Ok(item) => item.into_token_stream().into(),
+        Err(e) => e.to_compile_error().into(),
     }
-
-    if let Some(stmt) = let_write {
-        stmt.to_tokens(&mut body)
-    }
-    quote! {
-        #(#attrs)*
-        #vis #sig {
-            #body
-        }
-        Ok(Self { sysfs_dir })
-    }
-    .into()
-    // TokenStream1::new()
 }
 
 #[derive(Default)]
@@ -232,6 +205,18 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
 //
 // Code related to generating tokens starts here.
 //
+
+fn sysfs_attr(args: SysfsAttrArgs, item: ItemFn) -> syn::Result<TokenStream2> {
+    let item = ItemSysfsAttrFn::try_from(item)?;
+    let mut tokens = TokenStream2::new();
+    if let Ok(getter) = GetterFunction::try_from(item) {
+        tokens.extend(quote_spanned!(getter.span() => #getter));
+    }
+    // if let Ok(setter) = SetterFunction::try_from(sysfs_attr.clone()) {
+    //     tokens.extend(quote_spanned!(setter.span => #setter));
+    // }
+    Ok(tokens)
+}
 
 struct GetterFunction {
     attrs: Vec<Attribute>,
