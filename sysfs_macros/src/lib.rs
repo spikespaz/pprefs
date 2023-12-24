@@ -146,6 +146,9 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
             mut block,
         }: ItemFn,
     ) -> Result<Self, Self::Error> {
+        // Expect a local `let read = #init`, where the init is expected to be a
+        // function that infallibly transforms a string into the return type of
+        // this function.
         let let_read = block
             .stmts
             .iter()
@@ -160,6 +163,10 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
                 Stmt::Local(local) => local,
                 _ => unreachable!(),
             });
+
+        // Expect a local `let write = |#ident:#ty|` where init is a closure
+        // that forms an arbitrary type as a string suitable for output to
+        // the file.
         let let_write = block
             .stmts
             .iter()
@@ -174,6 +181,12 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
                 Stmt::Local(local) => local,
                 _ => unreachable!(),
             });
+
+        // The dots at the end of the function indicate "et cetera",
+        // where the generated content will be put. It is not allowed to have
+        // code after the `..`, but you may before.
+        // The `let_read` and `let_write` immediately precede this token,
+        // so additional code is expected to be at the top of the block.
         let dots = match block.stmts.pop() {
             Some(Stmt::Expr(
                 Expr::Range(ExprRange {
@@ -313,7 +326,7 @@ impl TryFrom<ItemSysfsAttrFn> for GetterFunction {
             block,
             ..
         }: ItemSysfsAttrFn,
-    ) -> Result<Self, Self::Error> {
+    ) -> syn::Result<Self> {
         if let Some(mut local) = let_read {
             // Take all attributes from the local, and apply them to the function
             // instead. The local assignment will not retain attributes.
