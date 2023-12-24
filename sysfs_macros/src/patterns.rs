@@ -1,6 +1,6 @@
 use syn::parse::{Parse, ParseStream};
 use syn::token::Brace;
-use syn::{braced, Attribute, Meta, MetaList};
+use syn::{braced, AttrStyle, Attribute, Meta, MetaList};
 
 pub(crate) enum Items<T> {
     Braced {
@@ -25,6 +25,36 @@ impl<T> Items<T> {
         match self {
             Self::Braced { attrs, .. } | Self::TopLevel { attrs, .. } => attrs,
         }
+    }
+
+    pub fn inner_attrs(&self) -> Vec<&Attribute> {
+        self.attrs()
+            .iter()
+            .filter(|attr| {
+                matches!(
+                    attr,
+                    Attribute {
+                        style: AttrStyle::Inner(_),
+                        ..
+                    }
+                )
+            })
+            .collect()
+    }
+
+    pub fn outer_attrs(&self) -> Vec<&Attribute> {
+        self.attrs()
+            .iter()
+            .filter(|attr| {
+                matches!(
+                    attr,
+                    Attribute {
+                        style: AttrStyle::Outer,
+                        ..
+                    }
+                )
+            })
+            .collect()
     }
 }
 
