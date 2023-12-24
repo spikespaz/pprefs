@@ -6,42 +6,22 @@ mod patterns;
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use syn::parse::{Parse, ParseStream};
+use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
     parse_macro_input, Attribute, Block, Error, Expr, ExprClosure, ExprLit, ExprRange, FnArg,
-    Ident, ItemFn, Lit, LitStr, Local, LocalInit, Meta, MetaNameValue, Pat, PatIdent, PatType,
-    RangeLimits, Signature, Stmt, Token, Type, Visibility,
+    Ident, ItemFn, Lit, LitStr, Local, LocalInit, Meta, MetaNameValue, Pat, PatIdent, RangeLimits,
+    Signature, Stmt, Token, Type, Visibility,
 };
 
-#[derive(Default)]
-struct ItemSysfsAttrArgs {
-    sysfs_dir: Option<LitStr>,
-}
-
-impl Parse for ItemSysfsAttrArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        if input.is_empty() {
-            Ok(Self::default())
-        } else if input.peek(Token![in]) {
-            let _in_token = <Token![in]>::parse(input)?;
-            match Lit::parse(input)? {
-                Lit::Str(lit) => Ok(Self {
-                    sysfs_dir: Some(lit),
-                }),
-                lit => Err(Error::new(lit.span(), "expected a literal string")),
-            }
-        } else {
-            // match Punctuated::<Meta, Token![,]>::parse_terminated.parse(input)
-            todo!("parse meta")
-        }
-    }
-}
+//
+// Code related to parsing starts here.
+//
 
 #[proc_macro_attribute]
 pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
-    let args = parse_macro_input!(args as ItemSysfsAttrArgs);
+    let args = parse_macro_input!(args as SysfsAttrArgs);
     let item = parse_macro_input!(item as ItemFn);
 
     let ItemSysfsAttrFn {
@@ -66,15 +46,20 @@ pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
     if let Some(stmt) = let_write {
         stmt.to_tokens(&mut body)
     }
-
     quote! {
         #(#attrs)*
         #vis #sig {
             #body
         }
+        Ok(Self { sysfs_dir })
     }
     .into()
     // TokenStream1::new()
+}
+
+#[derive(Default)]
+struct SysfsAttrArgs {
+    sysfs_dir: Option<LitStr>,
 }
 
 #[derive(Clone)]
@@ -87,6 +72,95 @@ struct ItemSysfsAttrFn {
     dots: Token![..],
     block: Box<Block>,
 }
+
+#[derive(Default)]
+struct SysfsModArgs {
+    sysfs_dir: Option<LitStr>,
+}
+
+// struct ItemSysfsMod {
+//     span: Span,
+//     attrs: Vec<Attribute>,
+//     vis: Visibility,
+//     unsafety: Option<Token![unsafe]>,
+//     mod_token: Token![mod],
+//     ident: Ident,
+//     brace: Brace,
+//     items: Vec<ItemSysfsAttr>,
+// }
+
+impl Parse for SysfsAttrArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.is_empty() {
+            Ok(Self::default())
+        } else if input.peek(Token![in]) {
+            let _in_token = <Token![in]>::parse(input)?;
+            match Lit::parse(input)? {
+                Lit::Str(lit) => Ok(Self {
+                    sysfs_dir: Some(lit),
+                }),
+                lit => Err(Error::new(lit.span(), "expected a literal string")),
+            }
+        } else {
+            // match Punctuated::<Meta, Token![,]>::parse_terminated.parse(input)
+            todo!("parse meta")
+        }
+    }
+}
+
+#[rustfmt::skip]
+impl Parse for SysfsModArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut sysfs_dir = None;
+        let meta = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
+        meta.into_iter().try_for_each(|nested| match nested {
+            Meta::NameValue(MetaNameValue { path, value, .. }) if path.is_ident("sysfs_dir") => {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Str(literal),
+                    ..
+                }) = value
+                {
+                    Ok(sysfs_dir = Some(literal))
+                } else {
+                    Err(Error::new(value.span(), "expected a string literal"))
+                }
+            }
+            _ => Err(Error::new(nested.span(), "unknown meta")),
+        })?;
+
+        Ok(Self { sysfs_dir })
+    }
+}
+
+// impl Parse for ItemSysfsMod {
+//     fn parse(input: ParseStream) -> syn::Result<Self> {
+//         let mut attrs = Attribute::parse_outer(input)?;
+//         let vis = input.parse()?;
+//         let unsafety = input.parse()?;
+//         let mod_token = input.parse()?;
+//         let ident = input.parse()?;
+//         let (brace, items) = {
+//             let braced;
+//             let brace = braced!(braced in input);
+//             attrs.append(&mut Attribute::parse_inner(&braced)?);
+//             let mut items = Vec::new();
+//             while !braced.is_empty() {
+//                 items.push(braced.parse()?)
+//             }
+//             (brace, items)
+//         };
+//         Ok(ItemSysfsMod {
+//             span: input.span(),
+//             attrs,
+//             vis,
+//             unsafety,
+//             mod_token,
+//             brace,
+//             ident,
+//             items,
+//         })
+//     }
+// }
 
 impl TryFrom<ItemFn> for ItemSysfsAttrFn {
     type Error = Error;
@@ -103,7 +177,7 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
             .stmts
             .iter()
             .rposition(|stmt| {
-                matches!(stmt, Stmt::Local(local@Local {
+                matches!(stmt, Stmt::Local(Local {
                     pat: Pat::Ident(PatIdent { ident, .. }),
                     init: Some(LocalInit { .. }),
                     ..
@@ -117,7 +191,7 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
             .stmts
             .iter()
             .rposition(|stmt| {
-                matches!(stmt, Stmt::Local(local@Local {
+                matches!(stmt, Stmt::Local(Local {
                     pat: Pat::Ident(PatIdent { ident, .. }),
                     init: Some(LocalInit { .. }),
                     ..
@@ -155,11 +229,9 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
     }
 }
 
-mod kw {
-    syn::custom_keyword!(sysfs_attr);
-    syn::custom_keyword!(read);
-    syn::custom_keyword!(write);
-}
+//
+// Code related to generating tokens starts here.
+//
 
 struct GetterFunction {
     span: Span,
@@ -234,102 +306,6 @@ impl ToTokens for SetterFunction {
         ));
     }
 }
-
-// #[proc_macro]
-// pub fn impl_sysfs_attrs(tokens: TokenStream1) -> TokenStream1 {
-//     match parse_macro_input!(tokens as Items<ItemSysfsAttr>) {
-//         Items::Braced { brace_token, .. } => {
-//             Error::new(brace_token.span.span(), "unexpected brace")
-//                 .to_compile_error()
-//                 .into()
-//         }
-//         Items::TopLevel { attrs, items } => {
-//             let mut tokens = TokenStream2::new();
-//             for attr in attrs {
-//                 attr.to_tokens(&mut tokens)
-//             }
-//             for sysfs_attr in items {
-//                 if let Ok(getter) = GetterFunction::try_from(sysfs_attr.clone()) {
-//                     tokens.extend(quote_spanned!(getter.span => #getter));
-//                 }
-//                 if let Ok(setter) = SetterFunction::try_from(sysfs_attr.clone()) {
-//                     tokens.extend(quote_spanned!(setter.span => #setter));
-//                 }
-//             }
-//             tokens.into()
-//         }
-//     }
-// }
-
-#[derive(Default)]
-struct SysfsModArgs {
-    sysfs_dir: Option<LitStr>,
-}
-
-impl Parse for SysfsModArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut sysfs_dir = None;
-
-        let meta = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
-        meta.into_iter().try_for_each(|nested| match nested {
-            Meta::NameValue(MetaNameValue { path, value, .. }) if path.is_ident("sysfs_dir") => {
-                if let Expr::Lit(ExprLit {
-                    lit: Lit::Str(literal),
-                    ..
-                }) = value
-                {
-                    Ok(sysfs_dir = Some(literal))
-                } else {
-                    Err(Error::new(value.span(), "expected a string literal"))
-                }
-            }
-            _ => Err(Error::new(nested.span(), "unknown meta")),
-        })?;
-
-        Ok(Self { sysfs_dir })
-    }
-}
-
-// struct ItemSysfsMod {
-//     span: Span,
-//     attrs: Vec<Attribute>,
-//     vis: Visibility,
-//     unsafety: Option<Token![unsafe]>,
-//     mod_token: Token![mod],
-//     ident: Ident,
-//     brace: Brace,
-//     items: Vec<ItemSysfsAttr>,
-// }
-
-// impl Parse for ItemSysfsMod {
-//     fn parse(input: ParseStream) -> syn::Result<Self> {
-//         let mut attrs = Attribute::parse_outer(input)?;
-//         let vis = input.parse()?;
-//         let unsafety = input.parse()?;
-//         let mod_token = input.parse()?;
-//         let ident = input.parse()?;
-//         let (brace, items) = {
-//             let braced;
-//             let brace = braced!(braced in input);
-//             attrs.append(&mut Attribute::parse_inner(&braced)?);
-//             let mut items = Vec::new();
-//             while !braced.is_empty() {
-//                 items.push(braced.parse()?)
-//             }
-//             (brace, items)
-//         };
-//         Ok(ItemSysfsMod {
-//             span: input.span(),
-//             attrs,
-//             vis,
-//             unsafety,
-//             mod_token,
-//             brace,
-//             ident,
-//             items,
-//         })
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
