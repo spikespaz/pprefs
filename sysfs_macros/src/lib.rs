@@ -24,7 +24,7 @@ pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
     let args = parse_macro_input!(args as SysfsAttrArgs);
     let item = parse_macro_input!(item as ItemFn);
 
-    match sysfs_attr(args, item) {
+    match sysfs_attr(&args, item) {
         Ok(item) => item.into_token_stream().into(),
         Err(e) => e.to_compile_error().into(),
     }
@@ -219,14 +219,20 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
 // Code related to generating tokens starts here.
 //
 
-fn sysfs_attr(args: SysfsAttrArgs, item: ItemFn) -> syn::Result<TokenStream2> {
+fn sysfs_attr(args: &SysfsAttrArgs, item: ItemFn) -> syn::Result<TokenStream2> {
     let item = ItemSysfsAttrFn::try_from(item)?;
     let mut tokens = TokenStream2::new();
-    if let Ok(getter) = GetterFunction::try_from(item.clone()) {
-        tokens.extend(quote_spanned!(getter.span() => #getter));
+    if let Ok(mut getter) = GetterFunction::try_from(item.clone()) {
+        if let (None, Some(sysfs_dir)) = (&getter.sysfs_dir, &args.sysfs_dir) {
+            getter.sysfs_dir = Some(sysfs_dir.clone())
+        }
+        tokens.extend(getter.to_token_stream());
     }
-    if let Ok(setter) = SetterFunction::try_from(item.clone()) {
-        tokens.extend(quote_spanned!(setter.span() => #setter));
+    if let Ok(mut setter) = SetterFunction::try_from(item.clone()) {
+        if let (None, Some(sysfs_dir)) = (&setter.sysfs_dir, &args.sysfs_dir) {
+            setter.sysfs_dir = Some(sysfs_dir.clone())
+        }
+        tokens.extend(setter.to_token_stream());
     }
     Ok(tokens)
 }
