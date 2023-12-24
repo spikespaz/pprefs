@@ -4,14 +4,14 @@
 mod patterns;
 
 use proc_macro::TokenStream as TokenStream1;
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use syn::parse::{Parse, ParseBuffer, ParseStream};
+use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
     parse_macro_input, parse_quote, Attribute, Block, Error, Expr, ExprClosure, ExprLit, ExprRange,
-    FnArg, Ident, ItemFn, Lit, LitStr, Local, LocalInit, Meta, MetaNameValue, Pat, PatIdent,
+    Ident, ItemFn, Lit, LitStr, Local, LocalInit, Meta, MetaNameValue, Pat, PatIdent, PatType,
     RangeLimits, ReturnType, Signature, Stmt, Token, Type, Visibility,
 };
 
@@ -222,12 +222,12 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
 fn sysfs_attr(args: SysfsAttrArgs, item: ItemFn) -> syn::Result<TokenStream2> {
     let item = ItemSysfsAttrFn::try_from(item)?;
     let mut tokens = TokenStream2::new();
-    if let Ok(getter) = GetterFunction::try_from(item) {
+    if let Ok(getter) = GetterFunction::try_from(item.clone()) {
         tokens.extend(quote_spanned!(getter.span() => #getter));
     }
-    // if let Ok(setter) = SetterFunction::try_from(sysfs_attr.clone()) {
-    //     tokens.extend(quote_spanned!(setter.span => #setter));
-    // }
+    if let Ok(setter) = SetterFunction::try_from(item.clone()) {
+        tokens.extend(quote_spanned!(setter.span() => #setter));
+    }
     Ok(tokens)
 }
 
@@ -242,15 +242,14 @@ struct GetterFunction {
 }
 
 struct SetterFunction {
-    span: Span,
-    meta_attrs: Vec<Attribute>,
-    fn_vis: Visibility,
-    attr_name: Ident,
-    attr_path_args: Punctuated<FnArg, Token![,]>,
-    sysfs_dir: LitStr,
-    format_fn: ExprClosure,
+    attrs: Vec<Attribute>,
+    vis: Visibility,
+    sig: Signature,
+    let_write: Local,
     from_ident: Ident,
     from_type: Box<Type>,
+    stmts: Vec<Stmt>,
+    sysfs_dir: Option<LitStr>,
 }
 
 impl ToTokens for GetterFunction {
@@ -291,26 +290,36 @@ impl ToTokens for GetterFunction {
 impl ToTokens for SetterFunction {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
         let Self {
-            span,
-            meta_attrs,
-            fn_vis,
-            attr_name,
-            attr_path_args,
-            sysfs_dir,
-            format_fn,
+            attrs,
+            vis,
+            sig,
+            let_write,
             from_ident,
             from_type,
+            stmts,
+            sysfs_dir,
         } = self;
-        let attr_path_args = attr_path_args.iter();
-        let setter_ident = format_ident!("set_{}", attr_name);
-        tokens.extend(quote_spanned!(*span =>
-            #(#meta_attrs)*
-            #[allow(clippy::redundant_closure_call)]
-            #fn_vis fn #setter_ident(#(#attr_path_args,)* #from_ident: #from_type) -> sysfs::Result<()> {
-                let file_path = format!("{}/{}", format_args!(#sysfs_dir), stringify!(#attr_name));
-                sysfs::sysfs_write(&file_path, (#format_fn)(#from_ident))
+        let attr_name = &sig.ident;
+        let let_file_path = match sysfs_dir {
+            Some(literal) => quote! {
+                let file_path = format!("{}/{}", #literal, stringify!(#attr_name));
+            },
+            None => quote! {
+                let file_path = format!("{SYSFS_DIR}/{}", stringify!(#attr_name));
+            },
+        };
+
+        tokens.extend(quote! {
+            #(#attrs)*
+            #vis #sig {
+                #(#stmts)*
+                #let_file_path
+                #let_write
+                unsafe {
+                    sysfs::sysfs_write(&file_path, write(#from_ident))
+                }
             }
-        ));
+        });
     }
 }
 
@@ -358,6 +367,63 @@ impl TryFrom<ItemSysfsAttrFn> for GetterFunction {
                 "expected to find `let read = ...`",
             ))
         }
+    }
+}
+
+impl TryFrom<ItemSysfsAttrFn> for SetterFunction {
+    type Error = Error;
+
+    fn try_from(
+        ItemSysfsAttrFn {
+            mut attrs,
+            vis,
+            mut sig,
+            let_write,
+            block,
+            ..
+        }: ItemSysfsAttrFn,
+    ) -> syn::Result<Self> {
+        let mut local = let_write
+            .ok_or_else(|| Error::new(block.span(), "expected to find `let write = ...`"))?;
+
+        attrs.append(&mut local.attrs);
+
+        let (from_ident, from_type) = match &local.init {
+            Some(LocalInit {
+                expr,
+                diverge: None, // needs separate error
+                ..
+            }) => Ok(expr),
+            _ => Err(Error::new(local.span(), "TODO")),
+        }
+        .and_then(|expr| match expr.as_ref() {
+            Expr::Closure(ExprClosure { inputs, .. }) => Ok(inputs),
+            _ => Err(Error::new(local.span(), "TODO")),
+        })
+        .and_then(|inputs| match inputs.first() {
+            Some(Pat::Type(PatType { pat, ty, .. })) => Ok((pat, ty)),
+            _ => Err(Error::new(local.span(), "TODO")),
+        })
+        .and_then(|(pat, ty)| match pat.as_ref() {
+            Pat::Ident(PatIdent { ident, .. }) => Ok((ident, ty)),
+            _ => Err(Error::new(local.span(), "TODO")),
+        })
+        .map(|(ident, ty)| (ident.clone(), ty.clone()))?;
+
+        sig.ident = format_ident!("set_{}", sig.ident);
+        sig.inputs.push(parse_quote!(#from_ident: #from_type));
+        sig.output = parse_quote!(-> sysfs::Result<()>);
+
+        Ok(Self {
+            attrs,
+            vis,
+            sig,
+            let_write: local,
+            from_ident,
+            from_type,
+            stmts: block.stmts,
+            sysfs_dir: None,
+        })
     }
 }
 
