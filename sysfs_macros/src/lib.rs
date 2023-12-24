@@ -105,9 +105,9 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
             .rposition(|stmt| {
                 matches!(stmt, Stmt::Local(local@Local {
                     pat: Pat::Ident(PatIdent { ident, .. }),
-                    init: Some(LocalInit { expr, .. }),
+                    init: Some(LocalInit { .. }),
                     ..
-                }) if ident == "read" && matches!(expr.as_ref(), Expr::Closure(_)))
+                }) if ident == "read")
             })
             .map(|index| match block.stmts.remove(index) {
                 Stmt::Local(local) => local,
@@ -119,9 +119,9 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
             .rposition(|stmt| {
                 matches!(stmt, Stmt::Local(local@Local {
                     pat: Pat::Ident(PatIdent { ident, .. }),
-                    init: Some(LocalInit { expr, .. }),
+                    init: Some(LocalInit { .. }),
                     ..
-                }) if ident == "write" && matches!(expr.as_ref(), Expr::Closure(_)))
+                }) if ident == "write")
             })
             .map(|index| match block.stmts.remove(index) {
                 Stmt::Local(local) => local,
