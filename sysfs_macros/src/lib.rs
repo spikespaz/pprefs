@@ -173,13 +173,6 @@ mod kw {
     syn::custom_keyword!(write);
 }
 
-#[derive(Clone)]
-struct GetterSignature {
-    span: Span,
-    parse_fn: Expr,
-    into_type: Box<Type>,
-}
-
 struct GetterFunction {
     span: Span,
     meta_attrs: Vec<Attribute>,
@@ -189,14 +182,6 @@ struct GetterFunction {
     sysfs_dir: LitStr,
     parse_fn: Expr,
     into_type: Box<Type>,
-}
-
-#[derive(Clone)]
-struct SetterSignature {
-    span: Span,
-    format_fn: ExprClosure,
-    from_ident: Ident,
-    from_type: Box<Type>,
 }
 
 struct SetterFunction {
@@ -209,41 +194,6 @@ struct SetterFunction {
     format_fn: ExprClosure,
     from_ident: Ident,
     from_type: Box<Type>,
-}
-
-impl Parse for SetterSignature {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let expr: Expr = input.parse()?;
-        match &expr {
-            Expr::Closure(parse_fn) => {
-                let first_input = parse_fn.inputs.first().ok_or_else(|| {
-                    Error::new(parse_fn.span(), "expected at least one argument in closure")
-                })?;
-
-                let (from_ident, from_type) =
-                    if let Pat::Type(PatType { pat, ty, .. }) = first_input {
-                        if let Pat::Ident(PatIdent { ident, .. }) = pat.as_ref() {
-                            Ok((ident, ty))
-                        } else {
-                            Err(Error::new(pat.span(), "expected a single typed identifier"))
-                        }
-                    } else {
-                        Err(Error::new(
-                            first_input.span(),
-                            "expected a single typed identifier",
-                        ))
-                    }?;
-
-                Ok(Self {
-                    span: parse_fn.span(),
-                    format_fn: parse_fn.clone(),
-                    from_ident: from_ident.clone(),
-                    from_type: from_type.clone(),
-                })
-            }
-            _ => Err(Error::new(expr.span(), "expected a function closure")),
-        }
-    }
 }
 
 impl ToTokens for GetterFunction {
