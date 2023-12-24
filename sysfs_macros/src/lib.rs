@@ -59,12 +59,12 @@ pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
 
     let mut body = TokenStream2::new();
 
-    if let Some((local, _)) = let_read {
-        local.to_tokens(&mut body)
+    if let Some(stmt) = let_read {
+        stmt.to_tokens(&mut body)
     }
 
-    if let Some((local, _)) = let_write {
-        local.to_tokens(&mut body)
+    if let Some(stmt) = let_write {
+        stmt.to_tokens(&mut body)
     }
 
     quote! {
@@ -82,8 +82,8 @@ struct ItemSysfsAttrFn {
     attrs: Vec<Attribute>,
     vis: Visibility,
     sig: Signature,
-    let_read: Option<(Local, Box<Expr>)>,
-    let_write: Option<(Local, Box<Expr>)>,
+    let_read: Option<Local>,
+    let_write: Option<Local>,
     dots: Token![..],
     block: Box<Block>,
 }
@@ -102,41 +102,29 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
         let let_read = block
             .stmts
             .iter()
-            .filter(|stmt| {
-                matches!(stmt, Stmt::Local(Local {
+            .rposition(|stmt| {
+                matches!(stmt, Stmt::Local(local@Local {
                     pat: Pat::Ident(PatIdent { ident, .. }),
                     init: Some(LocalInit { expr, .. }),
                     ..
                 }) if ident == "read" && matches!(expr.as_ref(), Expr::Closure(_)))
             })
-            .last()
-            .map(|stmt| match stmt {
-                Stmt::Local(
-                    local @ Local {
-                        init: Some(LocalInit { expr, .. }),
-                        ..
-                    },
-                ) => (local.clone(), expr.clone()),
+            .map(|index| match block.stmts.remove(index) {
+                Stmt::Local(local) => local,
                 _ => unreachable!(),
             });
         let let_write = block
             .stmts
             .iter()
-            .filter(|stmt| {
-                matches!(stmt, Stmt::Local(Local {
+            .rposition(|stmt| {
+                matches!(stmt, Stmt::Local(local@Local {
                     pat: Pat::Ident(PatIdent { ident, .. }),
                     init: Some(LocalInit { expr, .. }),
                     ..
                 }) if ident == "write" && matches!(expr.as_ref(), Expr::Closure(_)))
             })
-            .last()
-            .map(|stmt| match stmt {
-                Stmt::Local(
-                    local @ Local {
-                        init: Some(LocalInit { expr, .. }),
-                        ..
-                    },
-                ) => (local.clone(), expr.clone()),
+            .map(|index| match block.stmts.remove(index) {
+                Stmt::Local(local) => local,
                 _ => unreachable!(),
             });
         let dots = match block.stmts.pop() {
