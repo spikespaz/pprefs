@@ -96,7 +96,7 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
             attrs,
             vis,
             sig,
-            block,
+            mut block,
         }: ItemFn,
     ) -> Result<Self, Self::Error> {
         let let_read = block
@@ -139,7 +139,7 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
                 ) => (local.clone(), expr.clone()),
                 _ => unreachable!(),
             });
-        let dots = match block.stmts.iter().last() {
+        let dots = match block.stmts.pop() {
             Some(Stmt::Expr(
                 Expr::Range(ExprRange {
                     attrs,
@@ -148,7 +148,7 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
                     end: None,
                 }),
                 None,
-            )) if attrs.is_empty() => Ok(*dots),
+            )) if attrs.is_empty() => Ok(dots),
             _ => Err(Error::new(
                 block.span(),
                 "expected `..` to be the return expression",
