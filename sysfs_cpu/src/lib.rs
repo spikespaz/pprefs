@@ -1,10 +1,8 @@
 //! <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#policy-interface-in-sysfs>
 use sysfs::Result;
 
-pub static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
-
 pub fn num_cpus() -> Result<usize> {
-    std::fs::read_dir(SYSFS_DIR)?.try_fold(0, |acc, res| match (acc, res) {
+    std::fs::read_dir(cpufreq::SYSFS_DIR)?.try_fold(0, |acc, res| match (acc, res) {
         (acc, Ok(inode))
             if {
                 let name = inode.file_name();
@@ -22,6 +20,8 @@ pub fn num_cpus() -> Result<usize> {
 
 pub mod cpufreq {
     use sysfs_macros::sysfs;
+
+    pub static SYSFS_DIR: &str = "/sys/devices/system/cpu/cpufreq";
 
     /// List of online CPUs belonging to this policy (i.e. sharing the
     /// hardware performance scaling interface represented by the policyX
@@ -151,7 +151,7 @@ pub mod cpufreq {
     #[sysfs(in "{SYSFS_DIR}/policy{cpu}")]
     pub fn scaling_governor(cpu: usize) -> String {
         let read = ToOwned::to_owned;
-        let write = |gov: &str| gov.to_string();
+        let write = |gov: &str| gov.to_owned();
         ..
     }
 

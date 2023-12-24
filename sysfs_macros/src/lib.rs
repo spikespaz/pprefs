@@ -5,7 +5,7 @@ mod patterns;
 
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{format_ident, quote, quote_spanned, ToTokens};
+use quote::{format_ident, quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -245,6 +245,7 @@ struct GetterFunction {
     let_read: Local,
     stmts: Vec<Stmt>,
     sysfs_dir: Option<LitStr>,
+    sysfs_file: String,
 }
 
 struct SetterFunction {
@@ -256,6 +257,17 @@ struct SetterFunction {
     from_type: Box<Type>,
     stmts: Vec<Stmt>,
     sysfs_dir: Option<LitStr>,
+    sysfs_file: String,
+}
+
+fn let_sysfs_path(sysfs_dir: &Option<LitStr>, sysfs_file: &str) -> Stmt {
+    let literal = match sysfs_dir {
+        Some(sysfs_dir) => format!("{}/{}", sysfs_dir.value(), sysfs_file),
+        None => format!("{}/{}", "{SYSFS_DIR}", sysfs_file),
+    };
+    parse_quote! {
+        let sysfs_path = format!(#literal);
+    }
 }
 
 impl ToTokens for GetterFunction {
@@ -268,25 +280,18 @@ impl ToTokens for GetterFunction {
             into_type,
             stmts,
             sysfs_dir,
+            sysfs_file,
         } = self;
-        let attr_name = &sig.ident;
-        let let_file_path = match sysfs_dir {
-            Some(literal) => quote_spanned! { literal.span() =>
-                let file_path = format!("{}/{}", #literal, stringify!(#attr_name));
-            },
-            None => quote! {
-                let file_path = format!("{SYSFS_DIR}/{}", stringify!(#attr_name));
-            },
-        };
+        let let_sysfs_path = let_sysfs_path(sysfs_dir, sysfs_file);
 
         tokens.extend(quote! {
             #(#attrs)*
             #vis #sig {
                 #(#stmts)*
-                #let_file_path
+                #let_sysfs_path
                 #let_read
                 unsafe {
-                    sysfs::sysfs_read::<#into_type>(&file_path, read)
+                    sysfs::sysfs_read::<#into_type>(&sysfs_path, read)
                 }
             }
         });
@@ -301,28 +306,21 @@ impl ToTokens for SetterFunction {
             sig,
             let_write,
             from_ident,
-            from_type,
+            from_type: _,
             stmts,
             sysfs_dir,
+            sysfs_file,
         } = self;
-        let attr_name = &sig.ident;
-        let let_file_path = match sysfs_dir {
-            Some(literal) => quote! {
-                let file_path = format!("{}/{}", #literal, stringify!(#attr_name));
-            },
-            None => quote! {
-                let file_path = format!("{SYSFS_DIR}/{}", stringify!(#attr_name));
-            },
-        };
+        let let_sysfs_path = let_sysfs_path(sysfs_dir, sysfs_file);
 
         tokens.extend(quote! {
             #(#attrs)*
             #vis #sig {
                 #(#stmts)*
-                #let_file_path
+                #let_sysfs_path
                 #let_write
                 unsafe {
-                    sysfs::sysfs_write(&file_path, write(#from_ident))
+                    sysfs::sysfs_write(&sysfs_path, write(#from_ident))
                 }
             }
         });
@@ -343,6 +341,8 @@ impl TryFrom<ItemSysfsAttrFn> for GetterFunction {
         }: ItemSysfsAttrFn,
     ) -> syn::Result<Self> {
         if let Some(mut local) = let_read {
+            let sysfs_file = sig.ident.to_string();
+
             // Take all attributes from the local, and apply them to the function
             // instead. The local assignment will not retain attributes.
             attrs.append(&mut local.attrs);
@@ -366,6 +366,7 @@ impl TryFrom<ItemSysfsAttrFn> for GetterFunction {
                 let_read: local,
                 stmts: block.stmts,
                 sysfs_dir: None,
+                sysfs_file,
             })
         } else {
             Err(Error::new(
@@ -389,6 +390,8 @@ impl TryFrom<ItemSysfsAttrFn> for SetterFunction {
             ..
         }: ItemSysfsAttrFn,
     ) -> syn::Result<Self> {
+        let sysfs_file = sig.ident.to_string();
+
         let mut local = let_write
             .ok_or_else(|| Error::new(block.span(), "expected to find `let write = ...`"))?;
 
@@ -429,6 +432,7 @@ impl TryFrom<ItemSysfsAttrFn> for SetterFunction {
             from_type,
             stmts: block.stmts,
             sysfs_dir: None,
+            sysfs_file,
         })
     }
 }
