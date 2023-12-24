@@ -10,9 +10,9 @@ use syn::parse::{Parse, ParseBuffer, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
-    parse_macro_input, Attribute, Block, Error, Expr, ExprClosure, ExprLit, ExprRange, FnArg,
-    Ident, ItemFn, Lit, LitStr, Local, LocalInit, Meta, MetaNameValue, Pat, PatIdent, RangeLimits,
-    Signature, Stmt, Token, Type, Visibility,
+    parse_macro_input, parse_quote, Attribute, Block, Error, Expr, ExprClosure, ExprLit, ExprRange,
+    FnArg, Ident, ItemFn, Lit, LitStr, Local, LocalInit, Meta, MetaNameValue, Pat, PatIdent,
+    RangeLimits, ReturnType, Signature, Stmt, Token, Type, Visibility,
 };
 
 //
@@ -234,14 +234,13 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
 //
 
 struct GetterFunction {
-    span: Span,
-    meta_attrs: Vec<Attribute>,
-    fn_vis: Visibility,
-    attr_name: Ident,
-    attr_path_args: Punctuated<FnArg, Token![,]>,
-    sysfs_dir: LitStr,
-    parse_fn: Expr,
+    attrs: Vec<Attribute>,
+    vis: Visibility,
+    sig: Signature,
     into_type: Box<Type>,
+    let_read: Local,
+    stmts: Vec<Stmt>,
+    sysfs_dir: Option<LitStr>,
 }
 
 struct SetterFunction {
@@ -259,25 +258,35 @@ struct SetterFunction {
 impl ToTokens for GetterFunction {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
         let Self {
-            span,
-            meta_attrs,
-            fn_vis,
-            attr_name,
-            attr_path_args,
-            sysfs_dir,
-            parse_fn,
+            attrs,
+            vis,
+            sig,
+            let_read,
             into_type,
+            stmts,
+            sysfs_dir,
         } = self;
-        let attr_path_args = attr_path_args.iter();
-        tokens.extend(quote_spanned!(*span =>
-            #(#meta_attrs)*
-            #fn_vis fn #attr_name(#(#attr_path_args,)*) -> sysfs::Result<#into_type> {
-                let file_path = format!("{}/{}", format_args!(#sysfs_dir), stringify!(#attr_name));
+        let attr_name = &sig.ident;
+        let let_file_path = match sysfs_dir {
+            Some(literal) => quote_spanned! { literal.span() =>
+                let file_path = format!("{}/{}", #literal, stringify!(#attr_name));
+            },
+            None => quote! {
+                let file_path = format!("{SYSFS_DIR}/{}", stringify!(#attr_name));
+            },
+        };
+
+        tokens.extend(quote! {
+            #(#attrs)*
+            #vis #sig {
+                #(#stmts)*
+                #let_file_path
+                #let_read
                 unsafe {
-                    sysfs::sysfs_read::<#into_type>(&file_path, #parse_fn)
+                    sysfs::sysfs_read::<#into_type>(&file_path, read)
                 }
             }
-        ))
+        });
     }
 }
 
@@ -304,6 +313,53 @@ impl ToTokens for SetterFunction {
                 sysfs::sysfs_write(&file_path, (#format_fn)(#from_ident))
             }
         ));
+    }
+}
+
+impl TryFrom<ItemSysfsAttrFn> for GetterFunction {
+    type Error = Error;
+
+    fn try_from(
+        ItemSysfsAttrFn {
+            mut attrs,
+            vis,
+            mut sig,
+            let_read,
+            block,
+            ..
+        }: ItemSysfsAttrFn,
+    ) -> Result<Self, Self::Error> {
+        if let Some(mut local) = let_read {
+            // Take all attributes from the local, and apply them to the function
+            // instead. The local assignment will not retain attributes.
+            attrs.append(&mut local.attrs);
+            // Extract the original type from the signature,
+            // and wrap the existing one with `sysfs::Result`.
+            let into_type;
+            (into_type, sig.output) = if let ReturnType::Type(_, ty) = sig.output {
+                Ok((ty.clone(), parse_quote!(-> sysfs::Result<#ty>)))
+            } else {
+                Err(Error::new(
+                    sig.output.span(),
+                    "explicit return type needed for getter function",
+                ))
+            }?;
+
+            Ok(Self {
+                attrs,
+                vis,
+                sig,
+                into_type,
+                let_read: local,
+                stmts: block.stmts,
+                sysfs_dir: None,
+            })
+        } else {
+            Err(Error::new(
+                block.span(),
+                "expected to find `let read = ...`",
+            ))
+        }
     }
 }
 
