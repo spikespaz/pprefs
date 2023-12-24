@@ -99,13 +99,69 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
             block,
         }: ItemFn,
     ) -> Result<Self, Self::Error> {
+        let let_read = block
+            .stmts
+            .iter()
+            .filter(|stmt| {
+                matches!(stmt, Stmt::Local(Local {
+                    pat: Pat::Ident(PatIdent { ident, .. }),
+                    init: Some(LocalInit { expr, .. }),
+                    ..
+                }) if ident == "read" && matches!(expr.as_ref(), Expr::Closure(_)))
+            })
+            .last()
+            .map(|stmt| match stmt {
+                Stmt::Local(
+                    local @ Local {
+                        init: Some(LocalInit { expr, .. }),
+                        ..
+                    },
+                ) => (local.clone(), expr.clone()),
+                _ => unreachable!(),
+            });
+        let let_write = block
+            .stmts
+            .iter()
+            .filter(|stmt| {
+                matches!(stmt, Stmt::Local(Local {
+                    pat: Pat::Ident(PatIdent { ident, .. }),
+                    init: Some(LocalInit { expr, .. }),
+                    ..
+                }) if ident == "write" && matches!(expr.as_ref(), Expr::Closure(_)))
+            })
+            .last()
+            .map(|stmt| match stmt {
+                Stmt::Local(
+                    local @ Local {
+                        init: Some(LocalInit { expr, .. }),
+                        ..
+                    },
+                ) => (local.clone(), expr.clone()),
+                _ => unreachable!(),
+            });
+        let dots = match block.stmts.iter().last() {
+            Some(Stmt::Expr(
+                Expr::Range(ExprRange {
+                    attrs,
+                    start: None,
+                    limits: RangeLimits::HalfOpen(dots),
+                    end: None,
+                }),
+                None,
+            )) if attrs.is_empty() => Ok(*dots),
+            _ => Err(Error::new(
+                block.span(),
+                "expected `..` to be the return expression",
+            )),
+        }?;
+
         Ok(Self {
             attrs,
             vis,
             sig,
-            let_read: Default::default(),
-            let_write: Default::default(),
-            dots: Default::default(),
+            let_read,
+            let_write,
+            dots,
             block,
         })
     }
