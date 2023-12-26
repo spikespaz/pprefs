@@ -15,6 +15,12 @@ use syn::{
     RangeLimits, ReturnType, Signature, Stmt, Token, Type, Visibility,
 };
 
+macro_rules! err {
+    ($tokens:expr, $message:expr) => {
+        Err(Error::new($tokens.span(), $message))
+    };
+}
+
 //
 // Code related to parsing starts here.
 //
@@ -68,7 +74,7 @@ fn expr_require_lit_str(expr: Expr) -> syn::Result<LitStr> {
         Expr::Lit(ExprLit {
             lit: Lit::Str(lit), ..
         }) => Ok(lit),
-        _ => Err(Error::new(expr.span(), "expected a literal string")),
+        _ => err!(expr, "expected a literal string"),
     }
 }
 
@@ -98,7 +104,7 @@ impl Parse for SysfsModArgs {
             Meta::NameValue(MetaNameValue { path, value, .. }) if path.is_ident("sysfs_dir") => {
                 Ok(sysfs_dir = Some(expr_require_lit_str(value)?))
             }
-            _ => Err(Error::new(arg.span(), "unknown meta")),
+            _ => err!(arg, "unknown meta"),
         })?;
 
         Ok(Self { sysfs_dir })
@@ -203,10 +209,7 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
                 }),
                 None,
             )) if attrs.is_empty() => Ok(dots),
-            _ => Err(Error::new(
-                block.span(),
-                "expected `..` to be the return expression",
-            )),
+            _ => err!(block, "expected `..` to be the return expression"),
         }?;
 
         Ok(Self {
@@ -357,10 +360,10 @@ impl TryFrom<ItemSysfsAttrFn> for GetterFunction {
             (into_type, sig.output) = if let ReturnType::Type(_, ty) = sig.output {
                 Ok((ty.clone(), parse_quote!(-> sysfs::Result<#ty>)))
             } else {
-                Err(Error::new(
-                    sig.output.span(),
-                    "explicit return type needed for getter function",
-                ))
+                err!(
+                    sig.output,
+                    "explicit return type needed for getter function"
+                )
             }?;
 
             Ok(Self {
@@ -374,10 +377,7 @@ impl TryFrom<ItemSysfsAttrFn> for GetterFunction {
                 sysfs_file,
             })
         } else {
-            Err(Error::new(
-                block.span(),
-                "expected to find `let read = ...`",
-            ))
+            err!(block, "expected to find `let read = ...`")
         }
     }
 }
@@ -408,19 +408,19 @@ impl TryFrom<ItemSysfsAttrFn> for SetterFunction {
                 diverge: None, // needs separate error
                 ..
             }) => Ok(expr),
-            _ => Err(Error::new(local.span(), "TODO")),
+            _ => err!(local, "expected to be initialized"),
         }
         .and_then(|expr| match expr.as_ref() {
             Expr::Closure(ExprClosure { inputs, .. }) => Ok(inputs),
-            _ => Err(Error::new(local.span(), "TODO")),
+            _ => err!(local, "expected a closure"),
         })
         .and_then(|inputs| match inputs.first() {
             Some(Pat::Type(PatType { pat, ty, .. })) => Ok((pat, ty)),
-            _ => Err(Error::new(local.span(), "TODO")),
+            _ => err!(local, "expected a typed identifier"),
         })
         .and_then(|(pat, ty)| match pat.as_ref() {
             Pat::Ident(PatIdent { ident, .. }) => Ok((ident, ty)),
-            _ => Err(Error::new(local.span(), "TODO")),
+            _ => err!(local, "expected an identifier"),
         })
         .map(|(ident, ty)| (ident.clone(), ty.clone()))?;
 
