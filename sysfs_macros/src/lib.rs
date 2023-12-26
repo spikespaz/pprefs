@@ -36,7 +36,7 @@ pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct SysfsAttrArgs {
     sysfs_dir: Option<LitStr>,
 }
@@ -52,9 +52,9 @@ struct ItemSysfsAttrFn {
     block: Box<Block>,
 }
 
-#[derive(Default)]
+#[derive(Clone)]
 struct SysfsModArgs {
-    sysfs_dir: Option<LitStr>,
+    sysfs_dir: LitStr,
 }
 
 // struct ItemSysfsMod {
@@ -89,25 +89,55 @@ impl Parse for SysfsAttrArgs {
                 sysfs_dir: Some(sysfs_dir),
             })
         } else {
-            // match Punctuated::<Meta, Token![,]>::parse_terminated.parse(input)
-            todo!("parse meta")
+            let mut sysfs_dir = None;
+
+            let args = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
+            args.into_iter().try_for_each(|arg| match arg {
+                Meta::NameValue(MetaNameValue { path, value, .. })
+                    if path.is_ident("sysfs_dir") =>
+                {
+                    Ok(sysfs_dir = Some(expr_require_lit_str(value)?))
+                }
+                _ => err!(arg, "unknown meta argument"),
+            })?;
+
+            let sysfs_dir = sysfs_dir
+                .ok_or_else(|| Error::new(input.span(), "argument `sysfs_dir` is required"))?;
+
+            Ok(Self {
+                sysfs_dir: Some(sysfs_dir),
+            })
         }
     }
 }
 
-#[rustfmt::skip]
 impl Parse for SysfsModArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut sysfs_dir = None;
-        let punc = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
-        punc.into_iter().try_for_each(|arg| match arg {
-            Meta::NameValue(MetaNameValue { path, value, .. }) if path.is_ident("sysfs_dir") => {
-                Ok(sysfs_dir = Some(expr_require_lit_str(value)?))
-            }
-            _ => err!(arg, "unknown meta"),
-        })?;
+        if input.is_empty() {
+            err!(input, "this attribute requires arguments")
+        } else if input.peek(Token![in]) {
+            let _in_token = <Token![in]>::parse(input)?;
+            let sysfs_dir = expr_require_lit_str(Expr::parse(input)?)?;
 
-        Ok(Self { sysfs_dir })
+            Ok(Self { sysfs_dir })
+        } else {
+            let mut sysfs_dir = None;
+
+            let args = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
+            args.into_iter().try_for_each(|arg| match arg {
+                Meta::NameValue(MetaNameValue { path, value, .. })
+                    if path.is_ident("sysfs_dir") =>
+                {
+                    Ok(sysfs_dir = Some(expr_require_lit_str(value)?))
+                }
+                _ => err!(arg, "unknown meta argument"),
+            })?;
+
+            let sysfs_dir = sysfs_dir
+                .ok_or_else(|| Error::new(input.span(), "argument `sysfs_dir` is required"))?;
+
+            Ok(Self { sysfs_dir })
+        }
     }
 }
 
@@ -247,7 +277,7 @@ fn sysfs_attr(args: &SysfsAttrArgs, item: ItemSysfsAttrFn) -> syn::Result<TokenS
 
 impl ToTokens for SysfsAttrArgs {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
-        let Self {sysfs_dir} = self;
+        let Self { sysfs_dir } = self;
         let mut args = Punctuated::<Meta, Token![,]>::new();
         if let Some(sysfs_dir) = sysfs_dir {
             args.push(parse_quote!(sysfs_dir = #sysfs_dir));
@@ -258,7 +288,7 @@ impl ToTokens for SysfsAttrArgs {
 
 impl ToTokens for SysfsModArgs {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
-        let Self {sysfs_dir} = self;
+        let Self { sysfs_dir } = self;
         let mut args = Punctuated::<Meta, Token![,]>::new();
         args.push(parse_quote!(sysfs_dir = #sysfs_dir));
         args.to_tokens(tokens)
