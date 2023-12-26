@@ -22,7 +22,7 @@ use syn::{
 #[proc_macro_attribute]
 pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
     let args = parse_macro_input!(args as SysfsAttrArgs);
-    let item = parse_macro_input!(item as ItemFn);
+    let item = parse_macro_input!(item as ItemSysfsAttrFn);
 
     match sysfs_attr(&args, item) {
         Ok(item) => item.into_token_stream().into(),
@@ -135,6 +135,12 @@ impl Parse for SysfsModArgs {
 //     }
 // }
 
+impl Parse for ItemSysfsAttrFn {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        ItemFn::parse(input)?.try_into()
+    }
+}
+
 impl TryFrom<ItemFn> for ItemSysfsAttrFn {
     type Error = Error;
 
@@ -219,8 +225,7 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
 // Code related to generating tokens starts here.
 //
 
-fn sysfs_attr(args: &SysfsAttrArgs, item: ItemFn) -> syn::Result<TokenStream2> {
-    let item = ItemSysfsAttrFn::try_from(item)?;
+fn sysfs_attr(args: &SysfsAttrArgs, item: ItemSysfsAttrFn) -> syn::Result<TokenStream2> {
     let mut tokens = TokenStream2::new();
     if let Ok(mut getter) = GetterFunction::try_from(item.clone()) {
         if let (Some(sysfs_dir), None) = (&args.sysfs_dir, &getter.sysfs_dir) {
