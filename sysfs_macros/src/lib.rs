@@ -245,6 +245,26 @@ fn sysfs_attr(args: &SysfsAttrArgs, item: ItemSysfsAttrFn) -> syn::Result<TokenS
     Ok(tokens)
 }
 
+impl ToTokens for SysfsAttrArgs {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        let Self {sysfs_dir} = self;
+        let mut args = Punctuated::<Meta, Token![,]>::new();
+        if let Some(sysfs_dir) = sysfs_dir {
+            args.push(parse_quote!(sysfs_dir = #sysfs_dir));
+        }
+        args.to_tokens(tokens)
+    }
+}
+
+impl ToTokens for SysfsModArgs {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        let Self {sysfs_dir} = self;
+        let mut args = Punctuated::<Meta, Token![,]>::new();
+        args.push(parse_quote!(sysfs_dir = #sysfs_dir));
+        args.to_tokens(tokens)
+    }
+}
+
 struct GetterFunction {
     attrs: Vec<Attribute>,
     vis: Visibility,
