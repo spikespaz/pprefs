@@ -62,18 +62,26 @@ struct SysfsModArgs {
 //     items: Vec<ItemSysfsAttr>,
 // }
 
+/// Discards the attributes.
+fn expr_require_lit_str(expr: Expr) -> syn::Result<LitStr> {
+    match expr {
+        Expr::Lit(ExprLit {
+            lit: Lit::Str(lit), ..
+        }) => Ok(lit),
+        _ => Err(Error::new(expr.span(), "expected a literal string")),
+    }
+}
+
 impl Parse for SysfsAttrArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         if input.is_empty() {
             Ok(Self::default())
         } else if input.peek(Token![in]) {
             let _in_token = <Token![in]>::parse(input)?;
-            match Lit::parse(input)? {
-                Lit::Str(lit) => Ok(Self {
-                    sysfs_dir: Some(lit),
-                }),
-                lit => Err(Error::new(lit.span(), "expected a literal string")),
-            }
+            let sysfs_dir = expr_require_lit_str(Expr::parse(input)?)?;
+            Ok(Self {
+                sysfs_dir: Some(sysfs_dir),
+            })
         } else {
             // match Punctuated::<Meta, Token![,]>::parse_terminated.parse(input)
             todo!("parse meta")
@@ -85,20 +93,12 @@ impl Parse for SysfsAttrArgs {
 impl Parse for SysfsModArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut sysfs_dir = None;
-        let meta = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
-        meta.into_iter().try_for_each(|nested| match nested {
+        let punc = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
+        punc.into_iter().try_for_each(|arg| match arg {
             Meta::NameValue(MetaNameValue { path, value, .. }) if path.is_ident("sysfs_dir") => {
-                if let Expr::Lit(ExprLit {
-                    lit: Lit::Str(literal),
-                    ..
-                }) = value
-                {
-                    Ok(sysfs_dir = Some(literal))
-                } else {
-                    Err(Error::new(value.span(), "expected a string literal"))
-                }
+                Ok(sysfs_dir = Some(expr_require_lit_str(value)?))
             }
-            _ => Err(Error::new(nested.span(), "unknown meta")),
+            _ => Err(Error::new(arg.span(), "unknown meta")),
         })?;
 
         Ok(Self { sysfs_dir })
@@ -223,13 +223,13 @@ fn sysfs_attr(args: &SysfsAttrArgs, item: ItemFn) -> syn::Result<TokenStream2> {
     let item = ItemSysfsAttrFn::try_from(item)?;
     let mut tokens = TokenStream2::new();
     if let Ok(mut getter) = GetterFunction::try_from(item.clone()) {
-        if let (None, Some(sysfs_dir)) = (&getter.sysfs_dir, &args.sysfs_dir) {
+        if let (Some(sysfs_dir), None) = (&args.sysfs_dir, &getter.sysfs_dir) {
             getter.sysfs_dir = Some(sysfs_dir.clone())
         }
         tokens.extend(getter.to_token_stream());
     }
     if let Ok(mut setter) = SetterFunction::try_from(item.clone()) {
-        if let (None, Some(sysfs_dir)) = (&setter.sysfs_dir, &args.sysfs_dir) {
+        if let (Some(sysfs_dir), None) = (&args.sysfs_dir, &setter.sysfs_dir) {
             setter.sysfs_dir = Some(sysfs_dir.clone())
         }
         tokens.extend(setter.to_token_stream());
