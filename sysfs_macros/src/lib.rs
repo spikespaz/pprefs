@@ -11,14 +11,20 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
     parse_macro_input, parse_quote, Attribute, Block, Error, Expr, ExprClosure, ExprLit, ExprRange,
-    Ident, ItemFn, Lit, LitStr, Local, LocalInit, Meta, MetaNameValue, Pat, PatIdent, PatType,
-    RangeLimits, ReturnType, Signature, Stmt, Token, Type, Visibility,
+    Ident, Item, ItemFn, ItemMod, Lit, LitStr, Local, LocalInit, Meta, MetaList, MetaNameValue,
+    Pat, PatIdent, PatType, RangeLimits, ReturnType, Signature, Stmt, Token, Type, Visibility,
 };
 
 macro_rules! err {
     ($tokens:expr, $message:expr) => {
         Err(Error::new($tokens.span(), $message))
     };
+}
+
+#[inline]
+fn meta_is_empty(meta: &Meta) -> bool {
+    matches!(meta, Meta::List(MetaList { tokens, .. }) if tokens.is_empty())
+        || matches!(meta, Meta::Path(_))
 }
 
 //
@@ -32,6 +38,17 @@ pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
 
     match sysfs_attr(&args, item) {
         Ok(item) => item.into_token_stream().into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+#[proc_macro_attribute]
+pub fn sysfs_attrs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
+    let args = parse_macro_input!(args as SysfsModArgs);
+    let mut item = parse_macro_input!(item as ItemMod);
+
+    match args.apply(&mut item) {
+        Ok(()) => item.to_token_stream().into(),
         Err(e) => e.to_compile_error().into(),
     }
 }
@@ -57,16 +74,73 @@ struct SysfsModArgs {
     sysfs_dir: LitStr,
 }
 
-// struct ItemSysfsMod {
-//     span: Span,
-//     attrs: Vec<Attribute>,
-//     vis: Visibility,
-//     unsafety: Option<Token![unsafe]>,
-//     mod_token: Token![mod],
-//     ident: Ident,
-//     brace: Brace,
-//     items: Vec<ItemSysfsAttr>,
-// }
+impl SysfsModArgs {
+    fn apply(&self, item: &mut ItemMod) -> syn::Result<()> {
+        // Take a mutable reference to the items vector.
+        let Some((_, items)) = &mut item.content else {
+            return err!(item.span(), "this item must have braced content");
+        };
+
+        for item in items.iter_mut() {
+            // We do not care about anything besides functions with the `sysfs`
+            // attribute.
+            let Item::Fn(ItemFn { attrs, .. }) = item else {
+                continue;
+            };
+
+            // Now check for the attribute.
+            for attr in attrs.iter_mut() {
+                if attr.path().is_ident("sysfs") {
+                    // We must avoid parsing the meta if there are no
+                    // parenthesis. This causes syntax errors even though
+                    // `SysfsAttrsArgs` already handles this case.
+                    if meta_is_empty(&attr.meta) {
+                        let args = SysfsAttrArgs::try_from(self.clone())?;
+                        attr.meta = parse_quote! { sysfs(#args) };
+                        break;
+                    }
+
+                    // Parse the existing `sysfs` arguments.
+                    let mut attr_args: SysfsAttrArgs = attr.parse_args()?;
+
+                    self.update_attr_args(&mut attr_args)?;
+
+                    // Replace the original arguments with the modified ones.
+                    if let Meta::List(meta) = &mut attr.meta {
+                        meta.tokens = attr_args.to_token_stream();
+                    } else {
+                        unreachable!();
+                    }
+
+                    // Multiple `sysfs` attributes on the same item is UB.
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn update_attr_args(&self, attr_args: &mut SysfsAttrArgs) -> syn::Result<()> {
+        // Perform necessary mutations on `sysfs_dir`.
+        if let Some(lit) = &mut attr_args.sysfs_dir {
+            // There is a path, and it may need to be prefixed, so check.
+            if let Some(path) = lit.value().strip_prefix("./") {
+                // Prefix the path with the module's `sysfs_dir`.
+                *lit = LitStr::new(&format!("{}/{}", self.sysfs_dir.value(), path), lit.span());
+            } else {
+                // Do nothing to the path.
+            }
+        } else {
+            // The definition did not have a `sysfs_dir`, so we clone
+            // the module's as a fallback.
+            attr_args.sysfs_dir = Some(self.sysfs_dir.clone());
+        }
+
+        // No other mutations currently.
+        Ok(())
+    }
+}
 
 /// Discards the attributes.
 fn expr_require_lit_str(expr: Expr) -> syn::Result<LitStr> {
@@ -140,36 +214,6 @@ impl Parse for SysfsModArgs {
         }
     }
 }
-
-// impl Parse for ItemSysfsMod {
-//     fn parse(input: ParseStream) -> syn::Result<Self> {
-//         let mut attrs = Attribute::parse_outer(input)?;
-//         let vis = input.parse()?;
-//         let unsafety = input.parse()?;
-//         let mod_token = input.parse()?;
-//         let ident = input.parse()?;
-//         let (brace, items) = {
-//             let braced;
-//             let brace = braced!(braced in input);
-//             attrs.append(&mut Attribute::parse_inner(&braced)?);
-//             let mut items = Vec::new();
-//             while !braced.is_empty() {
-//                 items.push(braced.parse()?)
-//             }
-//             (brace, items)
-//         };
-//         Ok(ItemSysfsMod {
-//             span: input.span(),
-//             attrs,
-//             vis,
-//             unsafety,
-//             mod_token,
-//             brace,
-//             ident,
-//             items,
-//         })
-//     }
-// }
 
 impl Parse for ItemSysfsAttrFn {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -292,6 +336,18 @@ impl ToTokens for SysfsModArgs {
         let mut args = Punctuated::<Meta, Token![,]>::new();
         args.push(parse_quote!(sysfs_dir = #sysfs_dir));
         args.to_tokens(tokens)
+    }
+}
+
+impl TryFrom<SysfsModArgs> for SysfsAttrArgs {
+    type Error = Error;
+
+    fn try_from(other: SysfsModArgs) -> syn::Result<Self> {
+        // This works for now since `sysfs_dir` is the only argument,
+        // but this may eventually be a fallible operation.
+        Ok(Self {
+            sysfs_dir: Some(other.sysfs_dir),
+        })
     }
 }
 

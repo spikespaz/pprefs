@@ -6,7 +6,7 @@ use sysfs_cpu::cpufreq;
 fn main() {
     for cpu_num in 0..cpu::num_cpus().unwrap() {
         println!(
-            r#"{}/policy{}:
+            r#"/sys/devices/system/cpu/cpufreq/policy{}:
     affected_cpus               - {:?}
     bios_limit                  - {:?}
     cpuinfo_cur_freq            - {:?}
@@ -21,7 +21,6 @@ fn main() {
     scaling_max_freq            - {:?}
     scaling_setspeed            - {:?}
 "#,
-            cpufreq::SYSFS_DIR,
             cpu_num,
             cpufreq::affected_cpus(cpu_num),
             cpufreq::bios_limit(cpu_num),
