@@ -108,7 +108,7 @@ pub mod cpufreq {
     /// and be listed by this attribute.]
     #[sysfs]
     pub fn scaling_available_governors(cpu: usize) -> Vec<String> {
-        let read = |text: &str| text.split(' ').map(ToOwned::to_owned).collect();
+        let read = |text: &str| text.split(' ').map(str::to_owned).collect();
         ..
     }
 
@@ -134,7 +134,7 @@ pub mod cpufreq {
     /// The scaling driver currently in use.
     #[sysfs]
     pub fn scaling_driver(cpu: usize) -> String {
-        let read = ToOwned::to_owned;
+        let read = str::to_owned;
         ..
     }
 
@@ -150,7 +150,7 @@ pub mod cpufreq {
     /// scaling_available_governors attribute described above).
     #[sysfs]
     pub fn scaling_governor(cpu: usize) -> String {
-        let read = ToOwned::to_owned;
+        let read = str::to_owned;
         let write = |gov: &str| gov.to_owned();
         ..
     }
@@ -244,7 +244,7 @@ pub mod amd_pstate {
     /// value is set by platform firmware. This attribute is read-only.
     #[sysfs]
     pub fn energy_performance_available_preferences(cpu: usize) -> Vec<String> {
-        let read = |text: &str| text.split(' ').map(ToOwned::to_owned).collect();
+        let read = |text: &str| text.split(' ').map(str::to_owned).collect();
         ..
     }
 
