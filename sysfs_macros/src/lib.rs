@@ -157,31 +157,42 @@ impl Parse for SysfsAttrArgs {
         if input.is_empty() {
             Ok(Self::default())
         } else if input.peek(Token![in]) {
+            // Special handling to extract the `in` token, and then re-parse
+            // as a comma-punctuated list.
             let _in_token = <Token![in]>::parse(input)?;
             let sysfs_dir = expr_require_lit_str(Expr::parse(input)?)?;
-            Ok(Self {
-                sysfs_dir: Some(sysfs_dir),
-            })
+            let mut args = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
+            args.insert(0, parse_quote!(sysfs_dir = #sysfs_dir));
+            Self::try_from(args)
         } else {
-            let mut sysfs_dir = None;
-
+            // Parse as a comma-punctuated list of `Meta` items.
             let args = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
-            args.into_iter().try_for_each(|arg| match arg {
-                Meta::NameValue(MetaNameValue { path, value, .. })
-                    if path.is_ident("sysfs_dir") =>
-                {
-                    Ok(sysfs_dir = Some(expr_require_lit_str(value)?))
-                }
-                _ => err!(arg, "unknown meta argument"),
-            })?;
-
-            let sysfs_dir = sysfs_dir
-                .ok_or_else(|| Error::new(input.span(), "argument `sysfs_dir` is required"))?;
-
-            Ok(Self {
-                sysfs_dir: Some(sysfs_dir),
-            })
+            Self::try_from(args)
         }
+    }
+}
+
+impl TryFrom<Punctuated<Meta, Token![,]>> for SysfsAttrArgs {
+    type Error = Error;
+
+    fn try_from(args: Punctuated<Meta, Token![,]>) -> syn::Result<Self> {
+        let args_span = args.span();
+
+        let mut sysfs_dir = None;
+
+        args.into_iter().try_for_each(|arg| match arg {
+            Meta::NameValue(MetaNameValue { path, value, .. }) if path.is_ident("sysfs_dir") => {
+                Ok(sysfs_dir = Some(expr_require_lit_str(value)?))
+            }
+            _ => err!(arg, "unknown meta argument"),
+        })?;
+
+        let sysfs_dir =
+            sysfs_dir.ok_or_else(|| Error::new(args_span, "argument `sysfs_dir` is required"))?;
+
+        Ok(Self {
+            sysfs_dir: Some(sysfs_dir),
+        })
     }
 }
 
