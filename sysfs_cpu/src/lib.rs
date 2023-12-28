@@ -193,3 +193,72 @@ pub mod cpufreq {
         ..
     }
 }
+
+// Currently the functions in here are all prefixed with `amd_pstate`.
+// The attribute files themselves are all in the `cpufreq` subdirectory.
+//
+// I thought it was best to put them in a separate module,
+// because it is a separate feature that has to be enabled by the kernel
+// parameter `amd_pstate=` as either `active`, `passive`, or `guided`.
+//
+// Because they are now in a separate module, I think it is best to remove the
+// prefix.
+#[sysfs_attrs(in "/sys/devices/system/cpu/cpufreq/policy{cpu}")]
+pub mod amd_pstate {
+    use sysfs_macros::sysfs;
+
+    /// Maximum CPPC performance and CPU frequency that the driver is allowed to
+    /// set, in percent of the maximum supported CPPC performance level (the
+    /// highest performance supported in AMD CPPC Performance Capability).
+    /// In some ASICs, the highest CPPC performance is not the one in the _CPC
+    /// table, so we need to expose it to sysfs. If boost is not active, but
+    /// still supported, this maximum frequency will be larger than the one in
+    /// cpuinfo. This attribute is read-only.
+    #[sysfs]
+    pub fn amd_pstate_highest_perf(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// See documentation for [`amd_pstate_highest_perf`].
+    #[sysfs]
+    pub fn amd_pstate_max_freq(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// The lowest non-linear CPPC CPU frequency that the driver is allowed to
+    /// set, in percent of the maximum supported CPPC performance level.
+    /// (Please see the lowest non-linear performance in AMD CPPC Performance
+    /// Capability.) This attribute is read-only.
+    #[sysfs]
+    pub fn amd_pstate_lowest_nonlinear_freq(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// A list of all the supported EPP preferences that could be used for
+    /// energy_performance_preference on this system. These profiles represent
+    /// different hints that are provided to the low-level firmware about the
+    /// user's desired energy vs efficiency tradeoff. default represents the epp
+    /// value is set by platform firmware. This attribute is read-only.
+    #[sysfs]
+    pub fn energy_performance_available_preferences(cpu: usize) -> Vec<String> {
+        let read = |text: &str| text.split(' ').map(ToOwned::to_owned).collect();
+        ..
+    }
+
+    /// The current energy performance preference can be read from this
+    /// attribute. and user can change current preference according to energy or
+    /// performance needs Please get all support profiles list from
+    /// energy_performance_available_preferences attribute, all the profiles are
+    /// integer values defined between 0 to 255 when EPP feature is enabled by
+    /// platform firmware, if EPP feature is disabled, driver will ignore the
+    /// written value This attribute is read-write.
+    #[sysfs]
+    pub fn energy_performance_preference(cpu: usize) -> String {
+        let read = str::to_owned;
+        let write = |epp: &str| epp.to_owned();
+        ..
+    }
+}
