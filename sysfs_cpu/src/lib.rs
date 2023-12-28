@@ -262,3 +262,71 @@ pub mod amd_pstate {
         ..
     }
 }
+
+#[sysfs_attrs(in "/sys/devices/system/cpu/cpu{cpu}")]
+pub mod acpi_cppc {
+    use sysfs_macros::sysfs;
+
+    /// Highest performance of this processor (abstract scale).
+    #[sysfs]
+    pub fn highest_perf(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// Highest sustained performance of this processor (abstract scale).
+    #[sysfs]
+    pub fn nominal_perf(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// Lowest performance of this processor with nonlinear power savings (abstract scale).
+    #[sysfs]
+    pub fn lowest_nonlinear_perf(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// Lowest performance of this processor (abstract scale).
+    #[sysfs]
+    pub fn lowest_perf(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// CPU frequency corresponding to lowest_perf (in MHz).
+    #[sysfs]
+    pub fn lowest_freq(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// CPU frequency corresponding to nominal_perf (in MHz). The above frequencies should only be used to report processor performance in frequency instead of abstract scale. These values should not be used for any functional decisions.
+    #[sysfs]
+    pub fn nominal_freq(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// Includes both Reference and delivered performance counter. Reference counter ticks up proportional to processor's reference performance. Delivered counter ticks up proportional to processor's delivered performance.
+    #[sysfs]
+    pub fn feedback_ctrs(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// Minimum time for the feedback counters to wraparound (seconds).
+    #[sysfs]
+    pub fn wraparound_time(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+
+    /// Performance level at which reference performance counter accumulates (abstract scale).
+    #[sysfs]
+    pub fn reference_perf(cpu: usize) -> usize {
+        let read = |text: &str| text.parse().unwrap();
+        ..
+    }
+}
