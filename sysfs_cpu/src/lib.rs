@@ -19,6 +19,7 @@ pub fn num_cpus() -> Result<usize> {
     })
 }
 
+/// <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html#policy-interface-in-sysfs>
 #[sysfs_attrs(in "/sys/devices/system/cpu/cpufreq/policy{cpu}")]
 pub mod cpufreq {
     use sysfs_macros::sysfs;
@@ -263,6 +264,7 @@ pub mod amd_pstate {
     }
 }
 
+/// <https://www.kernel.org/doc/html/latest/admin-guide/acpi/cppc_sysfs.html>
 #[sysfs_attrs(in "/sys/devices/system/cpu/cpu{cpu}")]
 pub mod acpi_cppc {
     use sysfs_macros::sysfs;
