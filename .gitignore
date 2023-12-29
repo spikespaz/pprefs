@@ -1,10 +1,15 @@
 # Rust
-/target
+target
+sysfs/Cargo.lock
 
 # Nix
 /result
 /result-man
 
 # Project
-/scratch.rs
+/**/scratch.rs
+
+# VS Code
+# only ignore at root
+/.vscode
 
