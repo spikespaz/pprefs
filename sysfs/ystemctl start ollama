@@ -1,0 +1,13 @@
+[0;1;31m×[0m ollama.service - Ollama Server
+     Loaded: loaded (]8;;file://odyssey/etc/systemd/system/ollama.service/etc/systemd/system/ollama.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;31mfailed[0m (Result: exit-code) since Fri 2023-12-29 12:43:04 MST; 2min 35s ago
+   Duration: 29ms
+    Process: 232498 ExecStart=/nix/store/a8zrzvnqdm39hnqldhb69p0kc448cz80-ollama-0.1.17/bin/ollama serve [0;1;31m(code=exited, status=1/FAILURE)[0m
+   Main PID: 232498 (code=exited, status=1/FAILURE)
+         IP: 0B in, 0B out
+        CPU: 25ms
+
+Dec 29 12:43:04 odyssey systemd[1]: ollama.service: Scheduled restart job, restart counter is at 3.
+Dec 29 12:43:04 odyssey systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mollama.service: Start request repeated too quickly.[0m
+Dec 29 12:43:04 odyssey systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mollama.service: Failed with result 'exit-code'.[0m
+Dec 29 12:43:04 odyssey systemd[1]: [0;1;31m[0;1;39m[0;1;31mFailed to start Ollama Server.[0m
