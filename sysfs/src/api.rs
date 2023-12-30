@@ -1,33 +1,16 @@
 //! <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#policy-interface-in-sysfs>
-use sysfs::Result;
+
 use sysfs_macros::sysfs_attrs;
 
-pub fn num_cpus() -> Result<usize> {
-    std::fs::read_dir("/sys/devices/system/cpu/cpufreq")?.try_fold(0, |acc, res| match (acc, res) {
-        (acc, Ok(inode))
-            if {
-                let name = inode.file_name();
-                let name = name.to_string_lossy();
-                name.starts_with("policy")
-                    && name["policy".len()..].chars().all(|ch| ch.is_ascii_digit())
-            } =>
-        {
-            Ok(acc + 1)
-        }
-        (acc, Ok(_)) => Ok(acc),
-        (_, Err(e)) => Err(e.into()),
-    })
-}
-
 /// <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html#policy-interface-in-sysfs>
-#[sysfs_attrs(in "/sys/devices/system/cpu/cpufreq/policy{cpu}")]
+#[sysfs_macros::sysfs_attrs(in "/sys/devices/system/cpu/cpufreq/policy{cpu}")]
 pub mod cpufreq {
-    use sysfs_macros::sysfs;
+    use sysfs_macros::sysfs_attr;
 
     /// List of online CPUs belonging to this policy (i.e. sharing the
     /// hardware performance scaling interface represented by the policyX
     /// policy object).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn affected_cpus(cpu: usize) -> Vec<usize> {
         let read = |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect();
         ..
@@ -46,7 +29,7 @@ pub mod cpufreq {
     ///
     /// This attribute is not present if the scaling driver in use does not
     /// support it.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn bios_limit(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
@@ -58,7 +41,7 @@ pub mod cpufreq {
     /// This is expected to be the frequency the hardware actually runs at.
     /// If that frequency cannot be determined, this attribute should not be
     /// present.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn cpuinfo_cur_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
@@ -66,7 +49,7 @@ pub mod cpufreq {
 
     /// Maximum possible operating frequency the CPUs belonging to this
     /// policy can run at (in kHz).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn cpuinfo_max_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
@@ -74,7 +57,7 @@ pub mod cpufreq {
 
     /// Minimum possible operating frequency the CPUs belonging to this
     /// policy can run at (in kHz).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn cpuinfo_min_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
@@ -86,14 +69,14 @@ pub mod cpufreq {
     /// If unknown or if known to be so high that the scaling driver does
     /// not work with the ondemand governor, -1 (CPUFREQ_ETERNAL) will be
     /// returned by reads from this attribute.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn cpuinfo_transition_latency(cpu: usize) -> isize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// List of all (online and offline) CPUs belonging to this policy.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn related_cpus(cpu: usize) -> Vec<usize> {
         let read = |text: &str| text.split(' ').map(|int| int.parse().unwrap()).collect();
         ..
@@ -107,7 +90,7 @@ pub mod cpufreq {
     /// [Note that some governors are modular and it may be necessary to
     /// load a kernel module for the governor held by it to become available
     /// and be listed by this attribute.]
-    #[sysfs]
+    #[sysfs_attr]
     pub fn scaling_available_governors(cpu: usize) -> Vec<String> {
         let read = |text: &str| text.split(' ').map(str::to_owned).collect();
         ..
@@ -126,14 +109,14 @@ pub mod cpufreq {
     /// more precisely reflecting the current CPU frequency through this
     /// attribute, but that still may not be the exact current CPU frequency
     /// as seen by the hardware at the moment.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn scaling_cur_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// The scaling driver currently in use.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn scaling_driver(cpu: usize) -> String {
         let read = str::to_owned;
         ..
@@ -149,7 +132,7 @@ pub mod cpufreq {
     /// intel_pstate case), as indicated by the string written to this
     /// attribute (which must be one of the names listed by the
     /// scaling_available_governors attribute described above).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn scaling_governor(cpu: usize) -> String {
         let read = str::to_owned;
         let write = |gov: &str| gov.to_owned();
@@ -162,7 +145,7 @@ pub mod cpufreq {
     /// This attribute is read-write and writing a string representing an
     /// integer to it will cause a new limit to be set (it must not be lower
     /// than the value of the scaling_min_freq attribute).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn scaling_max_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         let write = |freq: usize| format!("{freq}");
@@ -175,7 +158,7 @@ pub mod cpufreq {
     /// This attribute is read-write and writing a string representing a
     /// non-negative integer to it will cause a new limit to be set (it must
     /// not be higher than the value of the scaling_max_freq attribute).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn scaling_min_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         let write = |freq: usize| format!("{freq}");
@@ -187,7 +170,7 @@ pub mod cpufreq {
     ///
     /// It returns the last frequency requested by the governor (in kHz) or
     /// can be written to in order to set a new frequency for the policy.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn scaling_setspeed(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         let write = |freq: usize| format!("{freq}");
@@ -206,7 +189,7 @@ pub mod cpufreq {
 // prefix.
 #[sysfs_attrs(in "/sys/devices/system/cpu/cpufreq/policy{cpu}")]
 pub mod amd_pstate {
-    use sysfs_macros::sysfs;
+    use sysfs_macros::sysfs_attr;
 
     /// Maximum CPPC performance and CPU frequency that the driver is allowed to
     /// set, in percent of the maximum supported CPPC performance level (the
@@ -215,14 +198,14 @@ pub mod amd_pstate {
     /// table, so we need to expose it to sysfs. If boost is not active, but
     /// still supported, this maximum frequency will be larger than the one in
     /// cpuinfo. This attribute is read-only.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn amd_pstate_highest_perf(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// See documentation for [`amd_pstate_highest_perf`].
-    #[sysfs]
+    #[sysfs_attr]
     pub fn amd_pstate_max_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
@@ -232,7 +215,7 @@ pub mod amd_pstate {
     /// set, in percent of the maximum supported CPPC performance level.
     /// (Please see the lowest non-linear performance in AMD CPPC Performance
     /// Capability.) This attribute is read-only.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn amd_pstate_lowest_nonlinear_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
@@ -243,7 +226,7 @@ pub mod amd_pstate {
     /// different hints that are provided to the low-level firmware about the
     /// user's desired energy vs efficiency tradeoff. default represents the epp
     /// value is set by platform firmware. This attribute is read-only.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn energy_performance_available_preferences(cpu: usize) -> Vec<String> {
         let read = |text: &str| text.split(' ').map(str::to_owned).collect();
         ..
@@ -256,7 +239,7 @@ pub mod amd_pstate {
     /// integer values defined between 0 to 255 when EPP feature is enabled by
     /// platform firmware, if EPP feature is disabled, driver will ignore the
     /// written value This attribute is read-write.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn energy_performance_preference(cpu: usize) -> String {
         let read = str::to_owned;
         let write = |epp: &str| epp.to_owned();
@@ -267,66 +250,66 @@ pub mod amd_pstate {
 /// <https://www.kernel.org/doc/html/latest/admin-guide/acpi/cppc_sysfs.html>
 #[sysfs_attrs(in "/sys/devices/system/cpu/cpu{cpu}")]
 pub mod acpi_cppc {
-    use sysfs_macros::sysfs;
+    use sysfs_macros::sysfs_attr;
 
     /// Highest performance of this processor (abstract scale).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn highest_perf(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// Highest sustained performance of this processor (abstract scale).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn nominal_perf(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// Lowest performance of this processor with nonlinear power savings (abstract scale).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn lowest_nonlinear_perf(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// Lowest performance of this processor (abstract scale).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn lowest_perf(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// CPU frequency corresponding to lowest_perf (in MHz).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn lowest_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// CPU frequency corresponding to nominal_perf (in MHz). The above frequencies should only be used to report processor performance in frequency instead of abstract scale. These values should not be used for any functional decisions.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn nominal_freq(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// Includes both Reference and delivered performance counter. Reference counter ticks up proportional to processor's reference performance. Delivered counter ticks up proportional to processor's delivered performance.
-    #[sysfs]
+    #[sysfs_attr]
     pub fn feedback_ctrs(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// Minimum time for the feedback counters to wraparound (seconds).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn wraparound_time(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..
     }
 
     /// Performance level at which reference performance counter accumulates (abstract scale).
-    #[sysfs]
+    #[sysfs_attr]
     pub fn reference_perf(cpu: usize) -> usize {
         let read = |text: &str| text.parse().unwrap();
         ..

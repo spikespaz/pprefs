@@ -1,0 +1,15 @@
+// First, the profile name, then `on` identifies an event. In this case, the
+// event is `"battery"`.
+// When the active power supply switches to whatever is determined to
+// be the battery, it will apply this profile.
+profile "on-the-go" on="battery" {
+    set amd_pstate="guided"
+    set scaling_governor="powersave"
+    set energy_performance_preference="balance_power"
+}
+
+profile "plugged-in" on="mains" {
+    set amd_pstate="guided"
+    set scaling_governor="schedutil"
+    set energy_performance_preference="balance_performance"
+}

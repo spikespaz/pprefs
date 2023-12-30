@@ -32,11 +32,11 @@ fn meta_is_empty(meta: &Meta) -> bool {
 //
 
 #[proc_macro_attribute]
-pub fn sysfs(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
+pub fn sysfs_attr(args: TokenStream1, item: TokenStream1) -> TokenStream1 {
     let args = parse_macro_input!(args as SysfsAttrArgs);
     let item = parse_macro_input!(item as ItemSysfsAttrFn);
 
-    match sysfs_attr(&args, item) {
+    match sysfs_attr_impl(&args, item) {
         Ok(item) => item.into_token_stream().into(),
         Err(e) => e.to_compile_error().into(),
     }
@@ -313,7 +313,7 @@ impl TryFrom<ItemFn> for ItemSysfsAttrFn {
 // Code related to generating tokens starts here.
 //
 
-fn sysfs_attr(args: &SysfsAttrArgs, item: ItemSysfsAttrFn) -> syn::Result<TokenStream2> {
+fn sysfs_attr_impl(args: &SysfsAttrArgs, item: ItemSysfsAttrFn) -> syn::Result<TokenStream2> {
     let mut tokens = TokenStream2::new();
     if let Ok(mut getter) = GetterFunction::try_from(item.clone()) {
         if let (Some(sysfs_dir), None) = (&args.sysfs_dir, &getter.sysfs_dir) {

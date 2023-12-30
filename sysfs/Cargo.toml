@@ -1,10 +1,12 @@
+[workspace]
+members = ["sysfs_lib", "sysfs_macros"]
+
 [package]
 name = "sysfs"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+resolver = "2"
 
 [dependencies]
-paste = "1.0.14"
-thiserror = "1.0.50"
+sysfs_lib = { path = "./sysfs_lib" }
+sysfs_macros = { path = "./sysfs_macros" }
