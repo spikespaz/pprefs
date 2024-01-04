@@ -46,19 +46,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "sysfs"
+name = "sysfs_api"
+version = "0.1.0"
+dependencies = [
+ "sysfs_lib",
+ "sysfs_macros",
+]
+
+[[package]]
+name = "sysfs_lib"
 version = "0.1.0"
 dependencies = [
  "paste",
  "thiserror",
-]
-
-[[package]]
-name = "sysfs_api"
-version = "0.1.0"
-dependencies = [
- "sysfs",
- "sysfs_macros",
 ]
 
 [[package]]

@@ -6,5 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sysfs = { path = "../sysfs" }
+sysfs_lib = { path = "../sysfs_lib" }
 sysfs_macros = { path = "../sysfs_macros" }

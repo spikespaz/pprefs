@@ -1,5 +1,5 @@
 //! <https://www.kernel.org/doc/html/latest/admin-guide/pm/cpufreq.html?highlight=schedutil#policy-interface-in-sysfs>
-use sysfs::Result;
+use sysfs_lib::Result;
 use sysfs_macros::sysfs_attrs;
 
 pub fn num_cpus() -> Result<usize> {
