@@ -1,7 +1,7 @@
 // <https://github.com/torvalds/linux/blob/master/tools/power/cpupower/utils/helpers/sysfs.c>
 
-use sysfs_api::cpu;
-use sysfs_api::cpu::cpufreq;
+use sysfs::api::cpu;
+use sysfs::api::cpu::cpufreq;
 
 fn main() {
     for cpu_num in 0..cpu::num_cpus().unwrap() {
