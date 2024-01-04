@@ -48,14 +48,6 @@ dependencies = [
 name = "sysfs"
 version = "0.1.0"
 dependencies = [
- "sysfs_api",
- "sysfs_lib",
-]
-
-[[package]]
-name = "sysfs_api"
-version = "0.1.0"
-dependencies = [
  "sysfs_lib",
  "sysfs_macros",
 ]
