@@ -13,6 +13,7 @@ name = "pprefs"
 version = "0.1.0"
 dependencies = [
  "sysfs_cpu",
+ "sysfs_macros",
 ]
 
 [[package]]
