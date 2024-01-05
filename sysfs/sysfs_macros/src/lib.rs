@@ -388,7 +388,8 @@ struct SetterFunction {
 fn let_sysfs_path(sysfs_dir: &Option<LitStr>, sysfs_file: &str) -> Stmt {
     let literal = match sysfs_dir {
         Some(sysfs_dir) => format!("{}/{}", sysfs_dir.value(), sysfs_file),
-        None => format!("{}/{}", "{SYSFS_DIR}", sysfs_file),
+        // TODO what is SYSFS_DIR, where is it supposed to come from?
+        None => format!("{}/{}", "SYSFS_DIR", sysfs_file),
     };
     parse_quote! {
         let sysfs_path = format!(#literal);
@@ -416,7 +417,7 @@ impl ToTokens for GetterFunction {
                 #let_sysfs_path
                 #let_read
                 unsafe {
-                    sysfs::sysfs_read::<#into_type>(&sysfs_path, read)
+                    sysfs::lib::sysfs_read::<#into_type>(&sysfs_path, read)
                 }
             }
         });
@@ -445,7 +446,7 @@ impl ToTokens for SetterFunction {
                 #let_sysfs_path
                 #let_write
                 unsafe {
-                    sysfs::sysfs_write(&sysfs_path, write(#from_ident))
+                    sysfs::lib::sysfs_write(&sysfs_path, write(#from_ident))
                 }
             }
         });
