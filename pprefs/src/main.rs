@@ -4,7 +4,7 @@ use sysfs::api::cpu;
 use sysfs::api::cpu::cpufreq;
 
 fn main() {
-    for cpu_num in 0..cpu::num_cpus().unwrap() {
+    for cpu_num in 0..cpu::count_cpus().unwrap() {
         println!(
             r#"/sys/devices/system/cpu/cpufreq/policy{}:
     affected_cpus               - {:?}
